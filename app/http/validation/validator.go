@@ -1,4 +1,4 @@
-package http
+package validation
 
 import (
 	"mime/multipart"

@@ -5,7 +5,10 @@ import (
 	"strconv"
 
 	"github.com/gofiber/fiber/v2"
-	request "github.com/mousav1/weiser/app/http"
+	"github.com/mousav1/weiser/app/http/request"
+	"github.com/mousav1/weiser/app/http/response"
+	"github.com/mousav1/weiser/app/http/validation"
+
 	"github.com/mousav1/weiser/app/services"
 )
 
@@ -46,7 +49,7 @@ func (uc *userController) CreateUser(c *fiber.Ctx) error {
 		})
 	}
 
-	validator := request.NewValidator()
+	validator := validation.NewValidator()
 
 	if err := req.Validate(validator); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -69,31 +72,28 @@ func (uc *userController) CreateUser(c *fiber.Ctx) error {
 func (uc *userController) GetUserByID(c *fiber.Ctx) error {
 	req, err := request.New(c)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		res := response.New(nil, err.Error(), fiber.StatusInternalServerError)
+		return response.Send(c, res)
 	}
 
 	id, err := req.Int("id")
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "Invalid user ID",
-		})
+		res := response.New(nil, "Invalid user ID", fiber.StatusBadRequest)
+		return response.Send(c, res)
 	}
 
 	user, err := uc.userService.GetUserByID(uint(id))
 	if err != nil {
 		if errors.Is(err, ErrUserNotFound) {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-				"error": ErrUserNotFound,
-			})
+			res := response.New(nil, ErrUserNotFound.Error(), fiber.StatusNotFound)
+			return response.Send(c, res)
 		}
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": err.Error(),
-		})
+		res := response.New(nil, err.Error(), fiber.StatusInternalServerError)
+		return response.Send(c, res)
 	}
 
-	return c.Status(fiber.StatusOK).JSON(user)
+	res := response.New(user, "User data retrieved successfully", fiber.StatusOK)
+	return response.Send(c, res)
 }
 
 // GetUserByUsername retrieves a user by its username.

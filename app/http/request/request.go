@@ -1,4 +1,4 @@
-package http
+package request
 
 import (
 	"errors"
@@ -10,6 +10,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/mitchellh/mapstructure"
+	"github.com/mousav1/weiser/app/http/validation"
 )
 
 type Request struct {
@@ -275,7 +276,7 @@ func (r *Request) AllFiles() map[string][]*multipart.FileHeader {
 	return form.File
 }
 
-func (r *Request) Validate(validator *Validator) error {
+func (r *Request) Validate(validator *validation.Validator) error {
 	if validator == nil {
 		return nil
 	}
