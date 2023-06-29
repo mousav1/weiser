@@ -3,6 +3,7 @@ package views
 import (
 	"errors"
 	"html/template"
+	"path/filepath"
 
 	"github.com/flosch/pongo2"
 	"github.com/gofiber/fiber/v2"
@@ -24,7 +25,7 @@ const (
 )
 
 // View is a struct that represents a template view
-type View struct {
+type ViewTemplate struct {
 	Template *template.Template
 }
 
@@ -40,7 +41,7 @@ var templateEngineNames = map[TemplateEngine]string{
 }
 
 // Render renders the view with the given data
-func (v *View) Render(c *fiber.Ctx, data ViewData) error {
+func (v *ViewTemplate) Render(c *fiber.Ctx, data ViewData) error {
 	c.Set("Content-Type", "text/html; charset=utf-8")
 	viewData := struct{ Data ViewData }{Data: data}
 	err := v.Template.Execute(c, viewData)
@@ -61,23 +62,30 @@ func (v *ViewPongo2) RenderPongo2(c *fiber.Ctx, data ViewData) error {
 }
 
 // NewView creates a new view with the given template files and engine
-func NewView(files ...string) (interface{}, error) {
+func NewView(pattern string) (interface{}, error) {
 	engine := viper.GetString("template_engine")
 	if engine == "" {
 		return nil, errors.New("template engine is not specified in configuration")
 	}
 
+	templateDir := viper.GetString("template_dir")
+	if templateDir == "" {
+		return nil, errors.New("template directory is not specified in configuration")
+	}
+
+	templatePath := filepath.Join(templateDir, pattern)
+
 	var view interface{}
 	var err error
 	switch engine {
 	case templateEngineNames[HTMLTemplate]:
-		tpl := template.Must(template.ParseFiles(files...))
-		view = &View{
+		tpl := template.Must(template.ParseFiles(templatePath))
+		view = &ViewTemplate{
 			Template: tpl,
 		}
 	case templateEngineNames[Pongo2Template]:
 		var tpl *pongo2.Template
-		tpl, err = pongo2.FromFile(files[0])
+		tpl, err := pongo2.FromFile(templatePath)
 		if err != nil {
 			return nil, err
 		}
@@ -92,14 +100,14 @@ func NewView(files ...string) (interface{}, error) {
 }
 
 // view renders a view with the given data
-func view(c *fiber.Ctx, data ViewData, files ...string) error {
-	viewI, err := NewView(files...)
+func View(c *fiber.Ctx, data ViewData, files string) error {
+	viewI, err := NewView(files)
 	if err != nil {
 		return err
 	}
 
 	switch view := viewI.(type) {
-	case *View:
+	case *ViewTemplate:
 		err = view.Render(c, data)
 	case *ViewPongo2:
 		err = view.RenderPongo2(c, data)

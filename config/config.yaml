@@ -17,4 +17,4 @@ database:
 server:
   port: 8000
 template_engine: pongo2
-
+template_dir: "./resources"

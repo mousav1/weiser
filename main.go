@@ -5,7 +5,6 @@ import (
 	"log"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/template/html/v2"
 	"github.com/mousav1/weiser/app/database"
 	"github.com/mousav1/weiser/web"
 	"github.com/spf13/viper"
@@ -27,15 +26,12 @@ func main() {
 	}
 
 	// Create the Fiber app
-	app := fiber.New(fiber.Config{
-		Views: html.New("./app/views", ".html"),
-	})
+	app := fiber.New(fiber.Config{})
 
 	// app.Use(middleware.MiddlewareChain.Then)
 
 	// set static directory
 	app.Static("/static", "./static")
-
 	// Register the routes
 	// router, _ := web.NewApp(db)
 	// router.SetupRoutes(app

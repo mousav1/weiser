@@ -170,11 +170,15 @@ func (uc *userController) UpdateUser(c *fiber.Ctx) error {
 		})
 	}
 
-	// data := ViewData{
+	// data := views.ViewData{
 	// 	Title: "Home",
-	// 	Data:  // your data model
+	// 	Data:  "John Smith",
 	// }
-	// err := view(w, data, "index.html")
+	// err := views.View(c, data, "test.html")
+	// if err != nil {
+	// 	return err
+	// }
+	// return nil
 
 	return c.SendStatus(fiber.StatusNoContent)
 
