@@ -32,13 +32,13 @@ type CreateUserInput struct {
 }
 
 type userService struct {
-	userRepository repositories.UserRepository
+	userRepository *repositories.UserRepository
 }
 
 // NewUserService creates a new instance of userService.
-func NewUserService(ur repositories.UserRepository) UserService {
+func NewUserService(userRepository *repositories.UserRepository) UserService {
 	return &userService{
-		userRepository: ur,
+		userRepository,
 	}
 }
 
@@ -49,7 +49,7 @@ func (us *userService) CreateUser(username, email, password string) (*models.Use
 		Email:    email,
 		Password: password,
 	}
-	err := us.userRepository.Create(user)
+	err := us.userRepository.BaseRepository.Create(user)
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +58,7 @@ func (us *userService) CreateUser(username, email, password string) (*models.Use
 
 // GetUserByID retrieves a user by its ID.
 func (us *userService) GetUserByID(id uint) (*models.User, error) {
-	user, err := us.userRepository.GetByID(id)
+	user, err := us.userRepository.BaseRepository.GetByID(id)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +107,7 @@ func (us *userService) UpdateUser(id uint, username, email, password string) err
 	if password != "" {
 		user.Password = password
 	}
-	return us.userRepository.Update(user)
+	return us.userRepository.BaseRepository.Update(user)
 }
 
 // DeleteUser deletes an existing user.
@@ -116,35 +116,5 @@ func (us *userService) DeleteUser(id uint) error {
 	if err != nil {
 		return err
 	}
-	return us.userRepository.Delete(user)
+	return us.userRepository.BaseRepository.Delete(user)
 }
-
-// // GetByID returns a user with the given ID.
-// func (us *userService) GetByID(id uint) (*models.User, error) {
-// 	return us.userRepository.GetByID(id)
-// }
-
-// // GetByUsername returns a user with the given username.
-// func (us *userService) GetByUsername(username string) (*models.User, error) {
-// 	return us.userRepository.GetByUsername(username)
-// }
-
-// // GetByEmail returns a user with the given email.
-// func (us *userService) GetByEmail(email string) (*models.User, error) {
-// 	return us.userRepository.GetByEmail(email)
-// }
-
-// // Create creates a new user.
-// func (us *userService) Create(user *models.User) error {
-// 	return us.userRepository.Create(user)
-// }
-
-// // Update updates an existing user.
-// func (us *userService) Update(user *models.User) error {
-// 	return us.userRepository.Update(user)
-// }
-
-// // Delete deletes an existing user.
-// func (us *userService) Delete(user *models.User) error {
-// 	return us.userRepository.Delete(user)
-// }

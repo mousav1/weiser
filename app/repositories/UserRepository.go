@@ -7,49 +7,23 @@ import (
 	"gorm.io/gorm"
 )
 
-// UserRepository represents the repository for managing users.
-type UserRepository interface {
-	Create(*models.User) error
-	GetByID(uint) (*models.User, error)
-	GetByUsername(string) (*models.User, error)
-	GetByEmail(string) (*models.User, error)
-	Update(*models.User) error
-	Delete(*models.User) error
+type UserRepository struct {
+	db             *gorm.DB
+	BaseRepository BaseRepository[models.User]
 }
 
-type userRepository struct {
-	db *gorm.DB
-}
-
-// NewUserRepository creates a new instance of userRepository.
-func NewUserRepository(db *gorm.DB) UserRepository {
-	return &userRepository{
-		db: db,
+// NewUserRepository creates a new instance of UserRepository.
+func NewUserRepository(db *gorm.DB) *UserRepository {
+	return &UserRepository{
+		db:             db,
+		BaseRepository: NewBaseRepository[models.User](db),
 	}
-}
-
-// Create creates a new user.
-func (ur *userRepository) Create(user *models.User) error {
-	return ur.db.Create(user).Error
-}
-
-// GetByID retrieves a user by its ID.
-func (ur *userRepository) GetByID(id uint) (*models.User, error) {
-	var user models.User
-	err := ur.db.First(&user, id).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	return &user, nil
 }
 
 // GetByUsername retrieves a user by its username.
-func (ur *userRepository) GetByUsername(username string) (*models.User, error) {
+func (ur *UserRepository) GetByUsername(username string) (*models.User, error) {
 	var user models.User
-	err := ur.db.Where("username = ?", username).First(&user).Error
+	err := ur.BaseRepository.GetFirst(user, "username = ?", username)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
@@ -60,9 +34,9 @@ func (ur *userRepository) GetByUsername(username string) (*models.User, error) {
 }
 
 // GetByEmail retrieves a user by its email.
-func (ur *userRepository) GetByEmail(email string) (*models.User, error) {
+func (ur *UserRepository) GetByEmail(email string) (*models.User, error) {
 	var user models.User
-	err := ur.db.Where("email = ?", email).First(&user).Error
+	err := ur.BaseRepository.GetFirst(user, "email = ?", email)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
@@ -72,99 +46,24 @@ func (ur *userRepository) GetByEmail(email string) (*models.User, error) {
 	return &user, nil
 }
 
-// Update updates an existing user.
-func (ur *userRepository) Update(user *models.User) error {
-	return ur.db.Save(user).Error
-}
-
-// Delete deletes an existing user.
-func (ur *userRepository) Delete(user *models.User) error {
-	return ur.db.Delete(user).Error
-}
-
-// // FindByID retrieves a user by ID.
-// func (r *UserRepository) FindByID(id int) (*models.User, error) {
-// 	var user models.User
-// 	err := r.db.First(&user, id).Error
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	return &user, nil
+// func (br *UserRepository) Create(record *models.User) error {
+// 	return br.baseRepository.Create(record)
 // }
 
-// // FindByUsername retrieves a user by username.
-// func (r *UserRepository) FindByUsername(username string) (*models.User, error) {
-// 	var user models.User
-// 	err := r.db.Where("username = ?", username).First(&user).Error
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	return &user, nil
+// // Update updates an existing record in the database.
+// func (br *UserRepository) Update(record *models.User) error {
+// 	return br.baseRepository.Update(record)
 // }
 
-// // FindByEmail retrieves a user by email.
-// func (r *UserRepository) FindByEmail(email string) (*models.User, error) {
-// 	var user models.User
-// 	err := r.db.Where("email = ?", email).First(&user).Error
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	return &user, nil
+// func (br *UserRepository) Delete(record *models.User) error {
+// 	return br.baseRepository.Delete(record)
 // }
 
-// // GetByID returns a user with the given ID.
 // func (ur *UserRepository) GetByID(id uint) (*models.User, error) {
-// 	var user models.User
-// 	result := ur.db.First(&user, id)
-// 	if result.Error != nil {
-// 		return nil, result.Error
+// 	user := &models.User{}
+// 	user, err := ur.baseRepository.GetByID(id)
+// 	if err != nil {
+// 		return nil, err
 // 	}
-// 	return &user, nil
-// }
-
-// // GetByUsername returns a user with the given username.
-// func (ur *UserRepository) GetByUsername(username string) (*models.User, error) {
-// 	var user models.User
-// 	result := ur.db.Where("username = ?", username).First(&user)
-// 	if result.Error != nil {
-// 		return nil, result.Error
-// 	}
-// 	return &user, nil
-// }
-
-// // GetByEmail returns a user with the given email.
-// func (ur *UserRepository) GetByEmail(email string) (*models.User, error) {
-// 	var user models.User
-// 	result := ur.db.Where("email = ?", email).First(&user)
-// 	if result.Error != nil {
-// 		return nil, result.Error
-// 	}
-// 	return &user, nil
-// }
-
-// // Create creates a new user.
-// func (ur *UserRepository) Create(user *models.User) error {
-// 	result := ur.db.Create(user)
-// 	if result.Error != nil {
-// 		return result.Error
-// 	}
-// 	return nil
-// }
-
-// // Update updates an existing user.
-// func (ur *UserRepository) Update(user *models.User) error {
-// 	result := ur.db.Save(user)
-// 	if result.Error != nil {
-// 		return result.Error
-// 	}
-// 	return nil
-// }
-
-// // Delete deletes an existing user.
-// func (ur *UserRepository) Delete(user *models.User) error {
-// 	result := ur.db.Delete(user)
-// 	if result.Error != nil {
-// 		return result.Error
-// 	}
-// 	return nil
+// 	return user, nil
 // }
