@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"github.com/gofiber/fiber/v2"
-	"github.com/mousav1/weiser/app/views"
 )
 
 // HomeController is responsible for showing the home page.
@@ -20,9 +19,14 @@ func NewHomeController(base *BaseController) *HomeController {
 // Index shows the home page.
 func (c *HomeController) Index(ctx *fiber.Ctx) error {
 	// Render the home page template
-	v := views.NewView("base", "user/edit")
-	if err := v.Render(ctx, nil); err != nil {
-		return err
-	}
+	// data := ViewData{
+	// 	"Title": "Home",
+	// 	"Name":  "John Smith",
+	// }
+	// err := view(w, data, "index.html")
+	// if err != nil {
+	// 	return err
+	// }
 	return nil
+
 }

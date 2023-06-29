@@ -16,4 +16,5 @@ database:
     dbname: mydb
 server:
   port: 8000
+template_engine: pongo2
 

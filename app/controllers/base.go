@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"github.com/gofiber/fiber/v2"
-	"github.com/mousav1/weiser/app/views"
 )
 
 // BaseController is a base controller for all controllers in the application.
@@ -17,10 +16,14 @@ func NewBaseController() *BaseController {
 // Render renders the template.
 func (c *BaseController) Render(ctx *fiber.Ctx, data interface{}) error {
 	// Render the template
-	v := views.NewView("base", "user/edit")
-	if err := v.Render(ctx, data); err != nil {
-		return err
-	}
+	// data := ViewData{
+	// 	"Title": "Home",
+	// 	"Name":  "John Smith",
+	// }
+	// err := view(w, data, "index.html")
+	// if err != nil {
+	// 	return err
+	// }
 
 	return nil
 }
