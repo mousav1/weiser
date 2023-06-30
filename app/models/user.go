@@ -2,7 +2,7 @@ package models
 
 // User represents a user in the application.
 type User struct {
-	*BaseModel
+	BaseModel
 
 	Username string
 	Email    string

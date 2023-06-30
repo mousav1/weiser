@@ -19,4 +19,5 @@ func SetupRoutes(app *fiber.App, db *gorm.DB) {
 	userController := controllers.NewUserController(userService)
 
 	app.Get("/users/:id", userController.GetUserByID)
+	app.Post("/users", userController.CreateUser)
 }

@@ -7,7 +7,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/mousav1/weiser/app/http/request"
 	"github.com/mousav1/weiser/app/http/response"
-	"github.com/mousav1/weiser/app/http/validation"
 
 	"github.com/mousav1/weiser/app/services"
 )
@@ -49,13 +48,14 @@ func (uc *userController) CreateUser(c *fiber.Ctx) error {
 		})
 	}
 
-	validator := validation.NewValidator()
+	// validator := validation.NewValidator()
 
-	if err := req.Validate(validator); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": err.Error(),
-		})
-	}
+	// if err := req.Validate(validator); err != nil {
+	// 	return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+	// 		"error": err.Error(),
+	// 	})
+	// }
+
 	createdUser, err := uc.userService.CreateUser(user.Username, user.Email, user.Password)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{

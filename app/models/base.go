@@ -1,6 +1,5 @@
 package models
 
-// import "database/sql"
 import (
 	"time"
 
@@ -8,10 +7,12 @@ import (
 )
 
 type BaseModel struct {
-	gorm.Model
+	ID        uint           `gorm:"primaryKey" json:"id"`
+	CreatedAt time.Time      `gorm:"column:created_at" json:"created_at"`
+	UpdatedAt time.Time      `gorm:"column:updated_at" json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"column:deleted_at;index" json:"-"`
 }
 
-// BeforeCreate is a GORM hook that sets the CreatedAt and UpdatedAt timestamps.
 func (bm *BaseModel) BeforeCreate(tx *gorm.DB) error {
 	now := time.Now().UTC()
 	bm.CreatedAt = now
@@ -19,7 +20,7 @@ func (bm *BaseModel) BeforeCreate(tx *gorm.DB) error {
 	return nil
 }
 
-// BeforeUpdate is a GORM hook that sets the UpdatedAt timestamp.
+// BeforeUpdate sets the updated_at field for the model.
 func (bm *BaseModel) BeforeUpdate(tx *gorm.DB) error {
 	bm.UpdatedAt = time.Now().UTC()
 	return nil

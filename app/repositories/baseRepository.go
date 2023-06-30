@@ -3,6 +3,7 @@ package repositories
 import (
 	"context"
 	"errors"
+	"reflect"
 
 	"gorm.io/gorm"
 )
@@ -28,7 +29,26 @@ func NewBaseRepository[T any](db *gorm.DB) BaseRepository[T] {
 
 // Create creates a new user.
 func (br *BaseRepository[T]) Create(base *T) error {
+	if bm, ok := reflect.ValueOf(base).Elem().Interface().(interface {
+		BeforeCreate(tx *gorm.DB) error
+	}); ok {
+		if err := bm.BeforeCreate(br.db); err != nil {
+			return err
+		}
+	}
 	return br.db.Create(base).Error
+}
+
+// Update updates an existing user.
+func (br *BaseRepository[T]) Update(base *T) error {
+	if bm, ok := reflect.ValueOf(base).Elem().Interface().(interface {
+		BeforeUpdate(tx *gorm.DB) error
+	}); ok {
+		if err := bm.BeforeUpdate(br.db); err != nil {
+			return err
+		}
+	}
+	return br.db.Model(base).Updates(base).Error
 }
 
 // GetByID retrieves a user by its ID.
@@ -42,11 +62,6 @@ func (br *BaseRepository[T]) GetByID(id uint) (*T, error) {
 		return nil, err
 	}
 	return &base, nil
-}
-
-// Update updates an existing user.
-func (br *BaseRepository[T]) Update(base *T) error {
-	return br.db.Save(base).Error
 }
 
 // Delete deletes an existing user.
