@@ -10,17 +10,6 @@ import (
 	"gorm.io/gorm"
 )
 
-// func connectToDB() (*gorm.DB, error) {
-//     dbConfig := viper.GetStringMapString("database")
-//     dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", dbConfig["username"], dbConfig["password"], dbConfig["host"], dbConfig["port"], dbConfig["dbname"])
-//     db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
-//     if err != nil {
-//         return nil, err
-//     }
-
-//     return db, nil
-// }
-
 var DB *gorm.DB
 
 func Connect() (*gorm.DB, error) {

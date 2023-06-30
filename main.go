@@ -5,8 +5,8 @@ import (
 	"log"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/mousav1/weiser/app/database"
-	"github.com/mousav1/weiser/web"
+	"github.com/mousav1/weiser/database"
+	"github.com/mousav1/weiser/routes"
 	"github.com/spf13/viper"
 )
 
@@ -37,7 +37,7 @@ func main() {
 	// router.SetupRoutes(app
 	// wire.Build(providers.ProviderSet)
 	// userController := InitializeUserController()
-	web.SetupRoutes(app, db)
+	routes.SetupRoutes(app, db)
 
 	// Start the server
 	port := viper.GetString("server.port")
