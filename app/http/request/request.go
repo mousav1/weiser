@@ -14,15 +14,25 @@ import (
 )
 
 type Request struct {
-	ctx *fiber.Ctx
+	ctx      *fiber.Ctx
+	validate *validation.Validation // افزودن فیلد validate به struct Request
 }
 
 func New(ctx *fiber.Ctx) (*Request, error) {
 	if ctx == nil {
 		return nil, errors.New("ctx is nil")
 	}
+
+	validate := validation.New()
+
+	// تعریف تنظیمات خاص برای validator
+	// validate.RegisterValidation("my_validation", func(fl validator.FieldLevel) bool {
+	// 	// اعتبارسنجی خاص
+	// 	return true
+	// })
+
 	// additional error checks can be performed here
-	return &Request{ctx: ctx}, nil
+	return &Request{ctx: ctx, validate: validate}, nil
 }
 
 func (r *Request) Bind(data interface{}) error {
@@ -46,6 +56,11 @@ func (r *Request) Bind(data interface{}) error {
 		}
 	default:
 		return fmt.Errorf("unsupported content type: %s", contentType)
+	}
+
+	// اعتبارسنجی داده‌های دریافتی
+	if err := r.validate.Validate(data); err != nil {
+		return err
 	}
 
 	return nil
@@ -274,23 +289,4 @@ func (r *Request) AllFiles() map[string][]*multipart.FileHeader {
 		return nil
 	}
 	return form.File
-}
-
-func (r *Request) Validate(validator *validation.Validator) error {
-	if validator == nil {
-		return nil
-	}
-	values, err := r.All()
-	if err != nil {
-		return err
-	}
-	if err := validator.Validate(interface{}(values)); err != nil {
-		return err
-	}
-	if files := r.AllFiles(); len(files) > 0 {
-		if err := validator.ValidateFiles(files); err != nil {
-			return err
-		}
-	}
-	return nil
 }

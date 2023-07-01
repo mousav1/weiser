@@ -48,14 +48,6 @@ func (uc *userController) CreateUser(c *fiber.Ctx) error {
 		})
 	}
 
-	// validator := validation.NewValidator()
-
-	// if err := req.Validate(validator); err != nil {
-	// 	return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-	// 		"error": err.Error(),
-	// 	})
-	// }
-
 	createdUser, err := uc.userService.CreateUser(user.Username, user.Email, user.Password)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{

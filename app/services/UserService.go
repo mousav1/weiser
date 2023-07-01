@@ -26,9 +26,9 @@ type UpdateUserInput struct {
 
 // CreateUserInput represents the input required for creating a user.
 type CreateUserInput struct {
-	Username string `json:"username"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Username string `json:"username" validate:"required"`
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"required"`
 }
 
 type userService struct {
