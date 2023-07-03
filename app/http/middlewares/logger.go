@@ -1,20 +1,30 @@
 package middleware
 
-// import (
-// 	"fmt"
-// 	"github.com/gofiber/fiber/v2"
-// )
+import (
+	"os"
 
-// // LoggerMiddleware logs the request and response.
-// func LoggerMiddleware(c *fiber.Ctx, next func() error) error {
-// 	// Log the request.
-// 	fmt.Printf("Request: %s %s\n", c.Method(), c.Path())
+	"github.com/gofiber/fiber/v2"
+	"github.com/sirupsen/logrus"
+)
 
-// 	// Call the next middleware/handler in the chain.
-// 	err := next()
+func LoggerMiddleware(c *fiber.Ctx) error {
+	// Create a new instance of logrus logger
+	logger := logrus.New()
 
-// 	// Log the response.
-// 	fmt.Printf("Response: %d\n", c.Response().StatusCode())
+	// Set the output file for the logger
+	file, err := os.OpenFile("./storage/logs/logs.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	if err != nil {
+		logger.Error("Failed to open log file: ", err)
+	} else {
+		logger.SetOutput(file)
+	}
 
-// 	return err
-// }
+	// Log the request
+	logger.WithFields(logrus.Fields{
+		"method": c.Method(),
+		"path":   c.Path(),
+	}).Info("Request received")
+
+	// Call the next handler
+	return c.Next()
+}

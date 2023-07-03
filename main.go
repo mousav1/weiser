@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/gofiber/fiber/v2"
+	kernel "github.com/mousav1/weiser/app/http"
 	"github.com/mousav1/weiser/database"
 	"github.com/mousav1/weiser/routes"
 	"github.com/spf13/viper"
@@ -28,7 +29,9 @@ func main() {
 	// Create the Fiber app
 	app := fiber.New(fiber.Config{})
 
-	// app.Use(middleware.MiddlewareChain.Then)
+	for _, middleware := range kernel.Middleware {
+		app.Use(middleware)
+	}
 
 	// set static directory
 	app.Static("/static", "./static")
