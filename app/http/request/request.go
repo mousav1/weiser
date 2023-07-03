@@ -1,6 +1,7 @@
 package request
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"mime/multipart"
@@ -59,8 +60,11 @@ func (r *Request) Bind(data interface{}) error {
 	}
 
 	// اعتبارسنجی داده‌های دریافتی
-	if err := r.validate.Validate(data); err != nil {
-		return err
+	validationErrors, _ := r.validate.Validate(data)
+	if validationErrors != nil {
+		response := r.validate.CreateErrorResponse(validationErrors)
+		jsonResp, _ := json.Marshal(response)
+		return fiber.NewError(http.StatusBadRequest, string(jsonResp))
 	}
 
 	return nil
