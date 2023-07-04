@@ -3,6 +3,7 @@ package database
 import (
 	"fmt"
 
+	errors "github.com/mousav1/weiser/app/error"
 	"github.com/mousav1/weiser/app/models"
 	"github.com/spf13/viper"
 	"gorm.io/driver/mysql"
@@ -25,16 +26,16 @@ func Connect() (*gorm.DB, error) {
 	case "postgres":
 		DB, err = connectToPostgres()
 	default:
-		return nil, fmt.Errorf("Unknown database type")
+		return nil, errors.New("unknown database type")
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("Failed to connect to database: %s", err)
+		return nil, errors.Wrap(err, "failed to connect to database")
 	}
 
 	// Set up database migrations and seeds
 	if err := migrateAndSeed(); err != nil {
-		return nil, fmt.Errorf("Failed to run migrations and seeds: %s", err)
+		return nil, errors.Wrap(err, "failed to run migrations and seeds")
 	}
 
 	return DB, nil
@@ -55,11 +56,13 @@ func connectToMySQL() (*gorm.DB, error) {
 		mysqlConfig["dbname"])), &gorm.Config{})
 
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to connect to MySQL database")
 	}
 
 	// Set temporary memory buffers for spatial indexes
-	db.Exec("SET GLOBAL innodb_buffer_pool_size=1024 * 1024 * 1024")
+	if err := db.Exec("SET GLOBAL innodb_buffer_pool_size=1024 * 1024 * 1024").Error; err != nil {
+		return nil, errors.Wrap(err, "failed to set temporary memory buffers for spatial indexes")
+	}
 
 	return db, nil
 }
@@ -78,11 +81,13 @@ func connectToPostgres() (*gorm.DB, error) {
 		postgresConfig["port"])), &gorm.Config{})
 
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to connect to PostgreSQL database")
 	}
 
 	// Set temporary memory buffers for spatial indexes
-	db.Exec("SET work_mem = '1GB'")
+	if err := db.Exec("SET work_mem = '1GB'").Error; err != nil {
+		return nil, errors.Wrap(err, "failed to set temporary memory buffers for spatial indexes")
+	}
 
 	return db, nil
 }
@@ -90,21 +95,8 @@ func connectToPostgres() (*gorm.DB, error) {
 func migrateAndSeed() error {
 	// Migrate the schema
 	if err := DB.AutoMigrate(&models.User{}); err != nil {
-		return err
+		return errors.Wrap(err, "failed to migrate the schema")
 	}
-
-	// Create a user if there are no users in the database
-	// var count int64
-	// if err := DB.Model(&models.User{}).Count(&count).Error; err != nil {
-	// 	return err
-	// }
-
-	// if count == 0 {
-	// 	user := &models.User{Name: "John Doe", Email: "john.doe@example.com", Age: 30}
-	// 	if err := DB.Create(user).Error; err != nil {
-	// 		return err
-	// 	}
-	// }
 
 	return nil
 }

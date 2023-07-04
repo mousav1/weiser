@@ -3,6 +3,7 @@ package utils
 import (
 	"os"
 
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
@@ -10,17 +11,17 @@ import (
 var log = logrus.New()
 
 // InitLogger initializes the logger, sets the formatter and the output file
-func InitLogger() {
+func InitLogger() error {
 	log.Formatter = &logrus.TextFormatter{
 		DisableColors: true,
 		FullTimestamp: true,
 	}
 	file, err := os.OpenFile(viper.GetString("logging.path"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
-		log.Println(err)
-	} else {
-		log.Out = file
+		return errors.Wrap(err, "failed to open log file")
 	}
+	log.Out = file
+	return nil
 }
 
 // Info logs an info message

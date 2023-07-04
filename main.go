@@ -1,31 +1,41 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	kernel "github.com/mousav1/weiser/app/http"
 	"github.com/mousav1/weiser/database"
 	"github.com/mousav1/weiser/routes"
-	"github.com/mousav1/weiser/utils"
 	"github.com/spf13/viper"
+	"github.com/valyala/fasthttp"
 )
 
 func main() {
 
 	// set config
 	viper.SetConfigFile("config/config.yaml")
-	err := viper.ReadInConfig()
-	if err != nil {
-		fmt.Println("This is my first program in Go")
+	if err := viper.ReadInConfig(); err != nil {
+		log.Fatalf("failed to read configuration file: %s", err)
 	}
 
 	// Connect to the database
 	db, err := database.Connect()
+	sqlDB, err := db.DB()
 	if err != nil {
-		panic(fmt.Sprintf("Failed to connect to database: %s", err))
+		log.Fatalf("failed to connect to database: %s", err)
 	}
+	defer func() {
+		if err := sqlDB.Close(); err != nil {
+			log.Fatalf("failed to close database connection: %s", err)
+		}
+	}()
 
 	// Create the Fiber app
 	app := fiber.New(fiber.Config{})
@@ -35,22 +45,44 @@ func main() {
 		app.Use(middleware)
 	}
 
-	// Initialize the logger
-	utils.InitLogger()
-
 	// set static directory
 	app.Static("/static", "./static")
+
 	// Register the routes
-	// router, _ := web.NewApp(db)
-	// router.SetupRoutes(app
-	// wire.Build(providers.ProviderSet)
-	// userController := InitializeUserController()
-	routes.SetupRoutes(app, db)
+	if err := routes.SetupRoutes(app, db); err != nil {
+		log.Fatalf("failed to set up routes: %s", err)
+	}
 
 	// Start the server
 	port := viper.GetString("server.port")
 	if port == "" {
 		port = "3000"
 	}
-	log.Fatal(app.Listen(fmt.Sprintf(":%s", port)))
+
+	// define your routes and middleware here
+	server := &fasthttp.Server{
+		Handler: app.Handler(),
+	}
+
+	go func() {
+		if err := server.ListenAndServe(fmt.Sprintf(":%s", port)); err != nil {
+			log.Fatalf("failed to start server: %s", err)
+		}
+	}()
+
+	// Wait for signals to gracefully shutdown the server
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	sig := <-quit
+	log.Printf("signal received: %v, shutting down server...\n", sig)
+
+	// Create a context with a timeout of 5 seconds
+	_, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Shutdown the server gracefully
+	if err := server.Shutdown(); err != nil {
+		log.Fatalf("failed to shutdown server: %s", err)
+	}
 }

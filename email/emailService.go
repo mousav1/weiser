@@ -1,6 +1,7 @@
 package email
 
 import (
+	"errors"
 	"io"
 	"os"
 
@@ -23,65 +24,101 @@ type EmailService struct {
 	html        bool
 }
 
-func NewEmailService() *EmailService {
+func NewEmailService() (*EmailService, error) {
+	es := &EmailService{}
 	// Load the configuration file
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(".")
 	if err := viper.ReadInConfig(); err != nil {
-		panic(err)
+		return nil, err
 	}
 	// Get the SMTP configuration
 	smtpConfig := viper.GetStringMap("smtp")
-	host := smtpConfig["host"].(string)
-	port := smtpConfig["port"].(int)
-	username := smtpConfig["username"].(string)
-	password := smtpConfig["password"].(string)
-	return &EmailService{
-		host:     host,
-		port:     port,
-		username: username,
-		password: password,
+	host, ok := smtpConfig["host"].(string)
+	if !ok {
+		return nil, errors.New("missing smtp host configuration")
 	}
+	port, ok := smtpConfig["port"].(int)
+	if !ok {
+		return nil, errors.New("missing smtp port configuration")
+	}
+	username, ok := smtpConfig["username"].(string)
+	if !ok {
+		return nil, errors.New("missing smtp username configuration")
+	}
+	password, ok := smtpConfig["password"].(string)
+	if !ok {
+		return nil, errors.New("missing smtp password configuration")
+	}
+	es.host = host
+	es.port = port
+	es.username = username
+	es.password = password
+	return es, nil
 }
+
 func (es *EmailService) SetFrom(from string) *EmailService {
 	es.from = from
 	return es
 }
+
 func (es *EmailService) SetTo(to []string) *EmailService {
 	es.to = to
 	return es
 }
+
 func (es *EmailService) SetCc(cc []string) *EmailService {
 	es.cc = cc
 	return es
 }
+
 func (es *EmailService) SetBcc(bcc []string) *EmailService {
 	es.bcc = bcc
 	return es
 }
+
 func (es *EmailService) SetSubject(subject string) *EmailService {
 	es.subject = subject
 	return es
 }
+
 func (es *EmailService) SetBody(body string) *EmailService {
 	es.body = body
 	return es
 }
+
 func (es *EmailService) SetHtml(html bool) *EmailService {
 	es.html = html
 	return es
 }
+
 func (es *EmailService) Attach(file string) *EmailService {
 	es.attachments = append(es.attachments, file)
 	return es
 }
+
 func (es *EmailService) Send() error {
+	if es.from == "" {
+		return errors.New("missing sender email address")
+	}
+	if len(es.to) == 0 {
+		return errors.New("missing recipient email addresses")
+	}
+	if es.subject == "" {
+		return errors.New("missing email subject")
+	}
+	if es.body == "" {
+		return errors.New("missing email body")
+	}
+
 	// Create a new message
 	m := gomail.NewMessage()
+
 	// Set the sender and recipient
 	m.SetHeader("From", es.from)
 	m.SetHeader("To", es.to...)
+
 	// Set the CC and BCC headers
 	if len(es.cc) > 0 {
 		m.SetHeader("Cc", es.cc...)
@@ -89,6 +126,7 @@ func (es *EmailService) Send() error {
 	if len(es.bcc) > 0 {
 		m.SetHeader("Bcc", es.bcc...)
 	}
+
 	// Set the subject and body
 	m.SetHeader("Subject", es.subject)
 	if es.html {
@@ -96,18 +134,22 @@ func (es *EmailService) Send() error {
 	} else {
 		m.SetBody("text/plain", es.body)
 	}
+
 	// Add attachments
 	for _, file := range es.attachments {
 		if err := es.addAttachment(m, file); err != nil {
 			return err
 		}
 	}
+
 	// Create a new SMTP client
 	d := gomail.NewDialer(es.host, es.port, es.username, es.password)
+
 	// Send the message
 	if err := d.DialAndSend(m); err != nil {
 		return err
 	}
+
 	return nil
 }
 

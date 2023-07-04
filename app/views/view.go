@@ -2,6 +2,7 @@ package views
 
 import (
 	"errors"
+	"fmt"
 	"html/template"
 	"path/filepath"
 
@@ -46,7 +47,7 @@ func (v *ViewTemplate) Render(c *fiber.Ctx, data ViewData) error {
 	viewData := struct{ Data ViewData }{Data: data}
 	err := v.Template.Execute(c, viewData)
 	if err != nil {
-		return c.SendStatus(fiber.StatusInternalServerError)
+		return fmt.Errorf("could not render HTML template: %w", err)
 	}
 	return nil
 }
@@ -56,7 +57,7 @@ func (v *ViewPongo2) RenderPongo2(c *fiber.Ctx, data ViewData) error {
 	c.Set("Content-Type", "text/html; charset=utf-8")
 	err := v.Template.ExecuteWriter(pongo2.Context{"Data": data}, c)
 	if err != nil {
-		return c.SendStatus(fiber.StatusInternalServerError)
+		return fmt.Errorf("could not render Pongo2 template: %w", err)
 	}
 	return nil
 }
@@ -85,9 +86,9 @@ func NewView(pattern string) (interface{}, error) {
 		}
 	case templateEngineNames[Pongo2Template]:
 		var tpl *pongo2.Template
-		tpl, err := pongo2.FromFile(templatePath)
+		tpl, err = pongo2.FromFile(templatePath)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("could not parse Pongo2 template: %w", err)
 		}
 		view = &ViewPongo2{
 			Template: tpl,
@@ -96,14 +97,14 @@ func NewView(pattern string) (interface{}, error) {
 		return nil, errors.New("unsupported template engine")
 	}
 
-	return view, err
+	return view, nil
 }
 
 // view renders a view with the given data
 func View(c *fiber.Ctx, data ViewData, files string) error {
 	viewI, err := NewView(files)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not create view: %w", err)
 	}
 
 	switch view := viewI.(type) {
@@ -116,7 +117,7 @@ func View(c *fiber.Ctx, data ViewData, files string) error {
 	}
 
 	if err != nil {
-		return err
+		return fmt.Errorf("could not render view: %w", err)
 	}
 
 	return nil

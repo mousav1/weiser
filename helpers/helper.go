@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"math/rand"
 	"net/url"
@@ -12,32 +13,10 @@ import (
 	"time"
 )
 
-func dd(vars ...interface{}) {
-	for _, v := range vars {
-		fmt.Printf("%v (%v)\n", v, reflect.TypeOf(v))
-	}
-	panic("dd")
-}
-
-func strContains(s, substr string) bool {
-	return strings.Contains(s, substr)
-}
-
-func strReplace(s, old, new string) string {
-	return strings.ReplaceAll(s, old, new)
-}
-
-func isEmpty(s string) bool {
-	return len(strings.TrimSpace(s)) == 0
-}
-func isNumeric(s string) bool {
-	_, err := strconv.ParseFloat(s, 64)
-	return err == nil
-}
-
 func urlEncode(s string) string {
 	return url.QueryEscape(s)
 }
+
 func arrayFilter(arr []interface{}, f func(interface{}) bool) []interface{} {
 	var result []interface{}
 	for _, v := range arr {
@@ -158,13 +137,7 @@ func arraySearch(needle interface{}, haystack []interface{}) int {
 	}
 	return -1
 }
-func arraySlice(arr []interface{}, start int, length int) []interface{} {
-	end := start + length
-	if end > len(arr) {
-		end = len(arr)
-	}
-	return arr[start:end]
-}
+
 func arrayWalk(arr []interface{}, f func(interface{})) {
 	for _, v := range arr {
 		f(v)
@@ -296,10 +269,6 @@ func stringReverse(s string) string {
 	return string(runes)
 }
 
-func stringToInt(s string) (int, error) {
-	return strconv.Atoi(s)
-}
-
 func intToString(i int) string {
 	return strconv.Itoa(i)
 }
@@ -361,33 +330,54 @@ func fileExists(filename string) bool {
 	return err == nil
 }
 
-func fileWriteLines(filename string, lines []string) error {
-	file, err := os.Create(filename)
-	if err != nil {
-		return err
+func dd(vars ...interface{}) {
+	for _, v := range vars {
+		fmt.Printf("%v (%v)\n", v, reflect.TypeOf(v))
 	}
-	defer file.Close()
-
-	writer := bufio.NewWriter(file)
-	for _, line := range lines {
-		_, err := writer.WriteString(line + "\n")
-		if err != nil {
-			return err
-		}
-	}
-
-	return writer.Flush()
+	panic("dd")
 }
 
-func fileReadLines(filename string) ([]string, error) {
-	file, err := os.Open(filename)
+func strContains(s, substr string) bool {
+	return strings.Contains(s, substr)
+}
+
+func strReplace(s, old, new string) string {
+	return strings.ReplaceAll(s, old, new)
+}
+
+func isEmpty(s string) bool {
+	return len(strings.TrimSpace(s)) == 0
+}
+
+func isNumeric(s string) bool {
+	_, err := strconv.ParseFloat(s, 64)
+	return err == nil && strings.TrimSpace(s) != ""
+}
+
+func stringToInt(s string, defaultValue int) int {
+	if !isNumeric(s) {
+		return defaultValue
+	}
+	i, _ := strconv.Atoi(s)
+	return i
+}
+
+func arraySlice(arr []interface{}, start, length int) ([]interface{}, error) {
+	if start < 0 || start >= len(arr) || length < 0 || start+length > len(arr) {
+		return nil, errors.New("invalid start or length")
+	}
+	return arr[start : start+length], nil
+}
+
+func fileReadLines(filePath string) ([]string, error) {
+	f, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer f.Close()
 
-	scanner := bufio.NewScanner(file)
-	lines := make([]string, 0)
+	var lines []string
+	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		lines = append(lines, scanner.Text())
 	}
@@ -396,4 +386,35 @@ func fileReadLines(filename string) ([]string, error) {
 	}
 
 	return lines, nil
+}
+
+func fileWriteLines(filePath string, lines []string) error {
+	f, err := os.Create(filePath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	for _, line := range lines {
+		if _, err := f.WriteString(line + "\n"); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func generateRandomString(length int) string {
+	rand.Seed(time.Now().UnixNano())
+	var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+	b := make([]rune, length)
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(b)
+}
+
+func isValidUrl(u string) bool {
+	_, err := url.ParseRequestURI(u)
+	return err == nil
 }

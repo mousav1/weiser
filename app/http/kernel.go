@@ -4,6 +4,7 @@ import (
 	"reflect"
 
 	"github.com/gofiber/fiber/v2"
+	exceptions "github.com/mousav1/weiser/app/exceptions"
 	middleware "github.com/mousav1/weiser/app/http/middlewares"
 )
 
@@ -15,6 +16,7 @@ var MiddlewareAliases = map[string]func(*fiber.Ctx) error{
 // Define main middleware functions
 var Middleware = []func(*fiber.Ctx) error{
 	middleware.LoggerMiddleware,
+	exceptions.ErrorHandler,
 }
 
 // Define middleware struct

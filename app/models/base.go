@@ -3,6 +3,7 @@ package models
 import (
 	"time"
 
+	"github.com/pkg/errors"
 	"gorm.io/gorm"
 )
 
@@ -22,6 +23,9 @@ func (bm *BaseModel) BeforeCreate(tx *gorm.DB) error {
 
 // BeforeUpdate sets the updated_at field for the model.
 func (bm *BaseModel) BeforeUpdate(tx *gorm.DB) error {
+	if bm.ID == 0 {
+		return errors.New("invalid model ID")
+	}
 	bm.UpdatedAt = time.Now().UTC()
 	return nil
 }

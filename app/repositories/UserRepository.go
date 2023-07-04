@@ -22,7 +22,7 @@ func NewUserRepository(db *gorm.DB) *UserRepository {
 
 // GetByUsername retrieves a user by its username.
 func (ur *UserRepository) GetByUsername(username string) (*models.User, error) {
-	var user models.User
+	var user *models.User
 	err := ur.BaseRepository.GetFirst(user, "username = ?", username)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -30,12 +30,12 @@ func (ur *UserRepository) GetByUsername(username string) (*models.User, error) {
 		}
 		return nil, err
 	}
-	return &user, nil
+	return user, nil
 }
 
 // GetByEmail retrieves a user by its email.
 func (ur *UserRepository) GetByEmail(email string) (*models.User, error) {
-	var user models.User
+	var user *models.User
 	err := ur.BaseRepository.GetFirst(user, "email = ?", email)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -43,7 +43,7 @@ func (ur *UserRepository) GetByEmail(email string) (*models.User, error) {
 		}
 		return nil, err
 	}
-	return &user, nil
+	return user, nil
 }
 
 // func (br *UserRepository) Create(record *models.User) error {
