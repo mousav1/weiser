@@ -8,6 +8,7 @@ import (
 	kernel "github.com/mousav1/weiser/app/http"
 	"github.com/mousav1/weiser/database"
 	"github.com/mousav1/weiser/routes"
+	"github.com/mousav1/weiser/utils"
 	"github.com/spf13/viper"
 )
 
@@ -29,9 +30,13 @@ func main() {
 	// Create the Fiber app
 	app := fiber.New(fiber.Config{})
 
+	// add middlewares
 	for _, middleware := range kernel.Middleware {
 		app.Use(middleware)
 	}
+
+	// Initialize the logger
+	utils.InitLogger()
 
 	// set static directory
 	app.Static("/static", "./static")
