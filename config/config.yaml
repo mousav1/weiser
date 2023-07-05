@@ -25,3 +25,10 @@ smtp:
   password: your_password
 logging:
   path: "./storage/logs/logs.txt"
+cookie:
+  path: /
+  domain: example.com
+  secure: true
+  samesite: strict
+  httponly: true
+ 

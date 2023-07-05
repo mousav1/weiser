@@ -1,8 +1,12 @@
 package routes
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/mousav1/weiser/app/controllers"
+	"github.com/mousav1/weiser/app/cookies"
 	"github.com/mousav1/weiser/app/repositories"
 	"github.com/mousav1/weiser/app/services"
 	"github.com/pkg/errors"
@@ -37,6 +41,22 @@ func SetupRoutes(app *fiber.App, db *gorm.DB) error {
 	}
 
 	app.Get("/", homeController.Index)
+
+	app.Get("/set", func(c *fiber.Ctx) error {
+		username := "123"
+		expire := time.Now().Add(24 * time.Hour)
+		cookies.SetCookie(c, "username", username, expire, true, true)
+		return c.SendString("Cookie has been set!")
+	})
+
+	app.Get("/get", func(c *fiber.Ctx) error {
+		cookie, err := cookies.GetCookie(c, "username")
+		if err != nil {
+			return c.SendString("Cookie not found")
+		}
+
+		return c.SendString(fmt.Sprintf("Cookie value is: %s\n", cookie))
+	})
 
 	return nil
 }

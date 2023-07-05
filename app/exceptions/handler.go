@@ -1,8 +1,6 @@
 package errorhandler
 
 import (
-	"fmt"
-
 	"github.com/gofiber/fiber/v2"
 	"github.com/sirupsen/logrus"
 )
@@ -38,13 +36,4 @@ func Handler(ctx *fiber.Ctx) error {
 
 	// Proceed to next middleware
 	return ctx.Next()
-}
-
-func ErrorHandler() fiber.Handler {
-	return func(ctx *fiber.Ctx) error {
-		if err := Handler(ctx); err != nil {
-			return fiber.NewError(fiber.StatusInternalServerError, fmt.Sprintf("Internal Server Error"))
-		}
-		return ctx.Next()
-	}
 }
