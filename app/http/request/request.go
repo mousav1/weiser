@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"mime/multipart"
 	"net/http"
 	"strconv"
@@ -11,7 +12,9 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/mitchellh/mapstructure"
+	"github.com/mousav1/weiser/app/cookies"
 	"github.com/mousav1/weiser/app/http/validation"
+	"github.com/mousav1/weiser/app/session"
 )
 
 type Request struct {
@@ -293,4 +296,48 @@ func (r *Request) AllFiles() map[string][]*multipart.FileHeader {
 		return nil
 	}
 	return form.File
+}
+
+func (r *Request) getSessionID() (string, error) {
+	// Get the session manager
+	manager := session.GetSessionManager()
+
+	sessionID, err := cookies.GetCookie(r.ctx, "weiser_session")
+	if err != nil {
+		session := manager.StartSession(r.ctx)
+		return session.ID, nil
+	}
+	// Check if session ID is valid and has not expired
+	if err := manager.CheckExpiration(sessionID.(string)); err != nil {
+		return "", fmt.Errorf("session ID is invalid or has expired: %v", err)
+	}
+
+	return sessionID.(string), nil
+}
+
+func (r *Request) Getsession(key string) interface{} {
+	sessionID, err := r.getSessionID()
+	if err != nil {
+		log.Printf("Failed to get session ID: %v\n", err)
+		return nil
+	}
+	return session.GetSessionManager().Get(key, sessionID)
+}
+
+func (r *Request) Setsession(key string, value interface{}) {
+	sessionID, err := r.getSessionID()
+	if err != nil {
+		log.Printf("Failed to get session ID: %v\n", err)
+		return
+	}
+	session.GetSessionManager().Set(key, value, sessionID)
+}
+
+func (r *Request) Deletesession(key string) {
+	sessionID, err := r.getSessionID()
+	if err != nil {
+		log.Printf("Failed to get session ID: %v\n", err)
+		return
+	}
+	session.GetSessionManager().Delete(key, sessionID)
 }

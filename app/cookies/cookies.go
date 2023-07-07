@@ -40,16 +40,16 @@ func init() {
 	}
 }
 
-func SetCookie(c *fiber.Ctx, name string, value string, expire time.Time, httpOnly bool, secure bool) {
+func SetCookie(c *fiber.Ctx, name string, value string, expire time.Time) {
 	c.Cookie(&fiber.Cookie{
 		Name:     name,
 		Value:    value,
 		Path:     config.Path,
 		Domain:   config.Domain,
 		Expires:  expire,
-		Secure:   secure,
+		Secure:   config.Secure,
 		SameSite: sameSiteToString(config.SameSite),
-		HTTPOnly: httpOnly,
+		HTTPOnly: config.HTTPOnly,
 	})
 }
 

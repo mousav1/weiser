@@ -1,10 +1,12 @@
 package database
 
 import (
+	"context"
 	"fmt"
 
 	errors "github.com/mousav1/weiser/app/error"
 	"github.com/mousav1/weiser/app/models"
+	"github.com/redis/go-redis/v9"
 	"github.com/spf13/viper"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
@@ -73,12 +75,14 @@ func connectToPostgres() (*gorm.DB, error) {
 	postgresConfig := viper.GetStringMapString("database.postgres")
 
 	// Connect to the database using the settings loaded from the configuration file
-	db, err := gorm.Open(postgres.Open(fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
+	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s",
 		postgresConfig["host"],
 		postgresConfig["user"],
 		postgresConfig["password"],
 		postgresConfig["dbname"],
-		postgresConfig["port"])), &gorm.Config{})
+		postgresConfig["port"],
+		postgresConfig["sslmode"])
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to connect to PostgreSQL database")
@@ -92,9 +96,31 @@ func connectToPostgres() (*gorm.DB, error) {
 	return db, nil
 }
 
+// Connect to Redis database
+func ConnectToRedis() (*redis.Client, error) {
+	// Load Redis settings from configuration file
+	redisConfig := viper.GetStringMapString("database.redis")
+
+	// Connect to the Redis database using the settings loaded from the configuration file
+	client := redis.NewClient(&redis.Options{
+		Addr:     fmt.Sprintf("%s:%s", redisConfig["host"], redisConfig["port"]),
+		Password: redisConfig["password"],
+		DB:       0,
+	})
+
+	// Test the connection to the Redis database
+	_, err := client.Ping(context.Background()).Result()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to connect to Redis database")
+	}
+
+	return client, nil
+}
+
 func migrateAndSeed() error {
 	// Migrate the schema
-	if err := DB.AutoMigrate(&models.User{}); err != nil {
+	err := DB.AutoMigrate(&models.User{})
+	if err != nil {
 		return errors.Wrap(err, "failed to migrate the schema")
 	}
 

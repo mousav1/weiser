@@ -26,9 +26,17 @@ smtp:
 logging:
   path: "./storage/logs/logs.txt"
 cookie:
-  path: /
-  domain: example.com
+  name: "my_cookie"
+  path: "/"
+  domain: "example.com"
+  expires: "2030-12-31T00:00:00Z"
   secure: true
   samesite: strict
   httponly: true
+session:
+  type: "file"
+  key: "my-secret-key"
+  expirationTime: "2h"
+  file: 
+    path: "./storage/sessions/logs.txt"
  

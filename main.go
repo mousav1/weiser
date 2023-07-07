@@ -11,6 +11,8 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	kernel "github.com/mousav1/weiser/app/http"
+	middleware "github.com/mousav1/weiser/app/http/middlewares"
+	"github.com/mousav1/weiser/app/session"
 	"github.com/mousav1/weiser/database"
 	"github.com/mousav1/weiser/routes"
 	"github.com/spf13/viper"
@@ -36,6 +38,13 @@ func main() {
 			log.Fatalf("failed to close database connection: %s", err)
 		}
 	}()
+
+	// Initialize the session manager
+	if err := session.InitSessionManager(); err != nil {
+		log.Fatalf("failed to initialize session manager: %s", err)
+	}
+
+	go middleware.DeleteExpiredSessions()
 
 	// Create the Fiber app
 	app := fiber.New(fiber.Config{})

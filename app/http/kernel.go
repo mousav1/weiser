@@ -15,6 +15,7 @@ var MiddlewareAliases = map[string]func(*fiber.Ctx) error{
 // Define main middleware functions
 var Middleware = []func(*fiber.Ctx) error{
 	middleware.LoggerMiddleware,
+	middleware.SessionMiddleware,
 }
 
 // Define middleware struct

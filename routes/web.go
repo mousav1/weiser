@@ -41,11 +41,13 @@ func SetupRoutes(app *fiber.App, db *gorm.DB) error {
 	}
 
 	app.Get("/", homeController.Index)
+	app.Get("/set-session", homeController.SetSessionData)
+	app.Get("/get-session", homeController.GetSessionData)
 
 	app.Get("/set", func(c *fiber.Ctx) error {
 		username := "123"
 		expire := time.Now().Add(24 * time.Hour)
-		cookies.SetCookie(c, "username", username, expire, true, true)
+		cookies.SetCookie(c, "username", username, expire)
 		return c.SendString("Cookie has been set!")
 	})
 
