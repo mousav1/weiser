@@ -3,6 +3,8 @@ package database
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"time"
 
 	errors "github.com/mousav1/weiser/app/error"
 	"github.com/mousav1/weiser/app/models"
@@ -14,6 +16,7 @@ import (
 )
 
 var DB *gorm.DB
+var RedisClient *redis.Client
 
 func Connect() (*gorm.DB, error) {
 	// Load database settings from configuration file
@@ -96,25 +99,93 @@ func connectToPostgres() (*gorm.DB, error) {
 	return db, nil
 }
 
-// Connect to Redis database
-func ConnectToRedis() (*redis.Client, error) {
+func ConnectToRedis(redisConfig map[string]string) (*redis.Client, error) {
 	// Load Redis settings from configuration file
-	redisConfig := viper.GetStringMapString("database.redis")
-
-	// Connect to the Redis database using the settings loaded from the configuration file
+	db, err := strconv.Atoi(redisConfig["dbname"])
+	if err != nil {
+		return nil, err
+	}
+	// Connect to Redis using the settings loaded from the configuration file
 	client := redis.NewClient(&redis.Options{
-		Addr:     fmt.Sprintf("%s:%s", redisConfig["host"], redisConfig["port"]),
+		Addr:     redisConfig["host"] + ":" + redisConfig["port"],
 		Password: redisConfig["password"],
-		DB:       0,
+		DB:       db, // use default DB
 	})
 
-	// Test the connection to the Redis database
-	_, err := client.Ping(context.Background()).Result()
+	// Test the connection to Redis
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+
+	_, err = client.Ping(ctx).Result()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to connect to Redis database")
+		return nil, errors.Wrap(err, "failed to connect to Redis")
 	}
 
 	return client, nil
+}
+
+func WriteToRedis(key string, value string) error {
+	// Connect to Redis
+	if RedisClient == nil {
+		var err error
+		redisConfig := viper.GetStringMapString("database.redis.default")
+		RedisClient, err = ConnectToRedis(redisConfig)
+		if err != nil {
+			return errors.Wrap(err, "failed to connect to Redis")
+		}
+	}
+
+	// Write the value to Redis
+	err := RedisClient.Set(context.Background(), key, value, 0).Err()
+	if err != nil {
+		return errors.Wrap(err, "failed to write value to Redis")
+	}
+
+	return nil
+}
+
+func ReadFromRedis(key string) (string, error) {
+	// Connect to Redis
+	if RedisClient == nil {
+		var err error
+		redisConfig := viper.GetStringMapString("database.redis.default")
+		RedisClient, err = ConnectToRedis(redisConfig)
+		if err != nil {
+			return "", errors.Wrap(err, "failed to connect to Redis")
+		}
+	}
+
+	// Read the value from Redis
+	value, err := RedisClient.Get(context.Background(), key).Result()
+	if err != nil {
+		return "", errors.Wrap(err, "failed to read value from Redis")
+	}
+
+	return value, nil
+}
+
+func Close() error {
+	// Close the database connection
+	if DB != nil {
+		db, err := DB.DB()
+		if err != nil {
+			return errors.Wrap(err, "failed to get database connection")
+		}
+		err = db.Close()
+		if err != nil {
+			return errors.Wrap(err, "failed to close database connection")
+		}
+	}
+
+	// Close the Redis connection
+	if RedisClient != nil {
+		err := RedisClient.Close()
+		if err != nil {
+			return errors.Wrap(err, "failed to close Redis connection")
+		}
+	}
+
+	return nil
 }
 
 func migrateAndSeed() error {

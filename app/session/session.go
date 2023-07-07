@@ -12,6 +12,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/mousav1/weiser/app/cookies"
+	"github.com/mousav1/weiser/database"
 	"github.com/redis/go-redis/v9"
 	"github.com/spf13/viper"
 )
@@ -59,18 +60,8 @@ func InitSessionManager() error {
 }
 
 func NewRedisStorage() (*RedisStorage, error) {
-	redisAddr := viper.GetString("redis.addr")
-	redisPassword := viper.GetString("redis.password")
-	redisDB := viper.GetInt("redis.db")
-
-	client := redis.NewClient(&redis.Options{
-		Addr:     redisAddr,
-		Password: redisPassword,
-		DB:       redisDB,
-	})
-
-	// Test the Redis connection
-	_, err := client.Ping(context.Background()).Result()
+	redisConfig := viper.GetStringMapString("database.redis.cache")
+	client, err := database.ConnectToRedis(redisConfig)
 	if err != nil {
 		return nil, err
 	}
