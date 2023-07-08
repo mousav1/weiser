@@ -2,15 +2,22 @@ package controllers
 
 import (
 	"encoding/json"
+	"fmt"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/mousav1/weiser/app/cache"
 	"github.com/mousav1/weiser/app/http/request"
-	"github.com/mousav1/weiser/utils"
 )
 
 // HomeController is responsible for showing the home page.
 type HomeController struct {
 	*BaseController
+}
+
+type Person struct {
+	Name string `json:"name"`
+	Age  int    `json:"age"`
 }
 
 // NewHomeController creates a new instance of HomeController.
@@ -20,18 +27,25 @@ func NewHomeController() *HomeController {
 
 // Index shows the home page.
 func (c *HomeController) Index(ctx *fiber.Ctx) error {
-	// Render the home page template
-	// data := ViewData{
-	// 	"Title": "Home",
-	// 	"Name":  "John Smith",
-	// }
-	// err := view(w, data, "index.html")
-	// if err != nil {
-	// 	return err
-	// }
-	utils.Info("Hello, World!")
-	return ctx.SendString("Hello, World!")
+	person := Person{Name: "John", Age: 30}
+	err := cache.GetCache().Set("person", person, 5*time.Minute)
+	if err != nil {
+		return ctx.SendString(err.Error())
+	}
 
+	var cachedPerson Person
+	err = cache.GetCache().Get("person", &cachedPerson)
+	if err != nil {
+		if err == cache.ErrCacheMiss {
+			fmt.Println("Value not found in cache")
+		}
+		return ctx.SendString(err.Error())
+	}
+	cachedPersonJSON, err := json.Marshal(cachedPerson)
+	if err != nil {
+		return ctx.SendString(err.Error())
+	}
+	return ctx.SendString(string(cachedPersonJSON))
 }
 
 func (c *HomeController) SetSessionData(ctx *fiber.Ctx) error {

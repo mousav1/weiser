@@ -53,4 +53,7 @@ session:
   expirationTime: "2h"
   file: 
     path: "./storage/sessions/logs.txt"
- 
+cache:
+  type: memory
+  file: 
+    path: "./storage/cache/logs.txt"

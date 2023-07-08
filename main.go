@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/mousav1/weiser/app/cache"
 	kernel "github.com/mousav1/weiser/app/http"
 	middleware "github.com/mousav1/weiser/app/http/middlewares"
 	"github.com/mousav1/weiser/app/session"
@@ -43,8 +44,10 @@ func main() {
 	if err := session.InitSessionManager(); err != nil {
 		log.Fatalf("failed to initialize session manager: %s", err)
 	}
-
 	go middleware.DeleteExpiredSessions()
+
+	// Create a new in-memory cache with a default expiration of 1 minute
+	cache.NewCache(time.Minute, nil)
 
 	// Create the Fiber app
 	app := fiber.New(fiber.Config{})
