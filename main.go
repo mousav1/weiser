@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"github.com/gofiber/fiber/v2/middleware/compress"
 	"os"
 	"os/signal"
 	"syscall"
@@ -18,9 +18,25 @@ import (
 	"github.com/mousav1/weiser/routes"
 	"github.com/spf13/viper"
 	"github.com/valyala/fasthttp"
+
+	log "github.com/sirupsen/logrus"
 )
 
 func main() {
+
+	// setup logger
+	// Set the log formatter to output colored logs
+	log.SetFormatter(&log.TextFormatter{
+		ForceColors:     true,
+		DisableColors:   false,
+		FullTimestamp:   true,
+		TimestampFormat: time.RFC3339Nano,
+	})
+	// Set the output of logs to stdout
+	log.SetOutput(os.Stdout)
+	// Set the log level to debug
+	log.SetLevel(log.TraceLevel)
+	log.SetReportCaller(true)
 
 	// set config
 	viper.SetConfigFile("config/config.yaml")
@@ -60,6 +76,24 @@ func main() {
 	// set static directory
 	app.Static("/static", "./static")
 
+	// log each request
+	app.Use(func(c *fiber.Ctx) error {
+		start := time.Now()
+		err := c.Next()
+		latency := time.Since(start)
+		log.WithFields(log.Fields{
+			"time":    start.Format(time.RFC3339Nano),
+			"method":  c.Method(),
+			"path":    c.Path(),
+			"status":  c.Response().StatusCode,
+			"latency": latency,
+		}).Info("Request")
+		return err
+	})
+
+	// Enable gzip compression
+	app.Use(compress.New())
+
 	// Register the routes
 	if err := routes.SetupRoutes(app, db); err != nil {
 		log.Fatalf("failed to set up routes: %s", err)
@@ -75,6 +109,13 @@ func main() {
 	server := &fasthttp.Server{
 		Handler: app.Handler(),
 	}
+
+	//Log the start of the application
+	log.WithFields(log.Fields{
+		"Server running on ": port,
+	}).Info("Server running on")
+
+	fmt.Println("Press Ctrl+C to stop the server")
 
 	go func() {
 		if err := server.ListenAndServe(fmt.Sprintf(":%s", port)); err != nil {
