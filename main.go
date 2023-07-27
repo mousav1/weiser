@@ -63,14 +63,17 @@ func main() {
 	go middleware.DeleteExpiredSessions()
 
 	// Create a new in-memory cache with a default expiration of 1 minute
-	cache.NewCache(time.Minute, nil)
+	err = cache.NewCache(time.Minute, nil)
+	if err != nil {
+		log.Fatalf("failed to create cache: %s", err)
+	}
 
 	// Create the Fiber app
 	app := fiber.New(fiber.Config{})
 
 	// add middlewares
-	for _, middleware := range kernel.Middleware {
-		app.Use(middleware)
+	for _, myMiddleware := range kernel.Middleware {
+		app.Use(myMiddleware)
 	}
 
 	// set static directory
@@ -123,7 +126,7 @@ func main() {
 		}
 	}()
 
-	// Wait for signals to gracefully shutdown the server
+	// Wait for signals to gracefully shut down the server
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
