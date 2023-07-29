@@ -14,7 +14,7 @@ import (
 )
 
 func urlEncode(s string) string {
-	return url.QueryEscape(s)
+	return strings.Replace(url.QueryEscape(s), "+", "%20", -1)
 }
 
 func arrayFilter(arr []interface{}, f func(interface{}) bool) []interface{} {
@@ -72,18 +72,18 @@ func arrayChunk(arr []interface{}, size int) [][]interface{} {
 	}
 	return result
 }
+
 func arrayDiff(arr []interface{}, arrs ...[]interface{}) []interface{} {
-	var result []interface{}
-	for _, v := range arr {
-		found := false
-		for _, arr := range arrs {
-			if inArray(v, arr) {
-				found = true
-				break
-			}
+	m := make(map[interface{}]bool)
+	for _, v := range arrs {
+		for _, x := range v {
+			m[x] = true
 		}
-		if !found {
-			result = append(result, v)
+	}
+	var result []interface{}
+	for _, x := range arr {
+		if !m[x] {
+			result = append(result, x)
 		}
 	}
 	return result
@@ -104,17 +104,29 @@ func arrayKeys(arr map[interface{}]interface{}) []interface{} {
 	}
 	return keys
 }
+
 func arrayValues(arr map[interface{}]interface{}) []interface{} {
 	var values []interface{}
+	if len(arr) == 0 {
+		return []interface{}{}
+	}
 	for _, v := range arr {
 		values = append(values, v)
 	}
 	return values
 }
+
 func arrayMerge(arrs ...[]interface{}) []interface{} {
 	var result []interface{}
+	allEmpty := true
 	for _, arr := range arrs {
-		result = append(result, arr...)
+		if len(arr) > 0 {
+			allEmpty = false
+			result = append(result, arr...)
+		}
+	}
+	if allEmpty {
+		return []interface{}{}
 	}
 	return result
 }
@@ -143,15 +155,22 @@ func arrayWalk(arr []interface{}, f func(interface{})) {
 		f(v)
 	}
 }
+
 func arrayColumn(arr [][]interface{}, columnIndex int) []interface{} {
 	var result []interface{}
+	found := false
 	for _, row := range arr {
-		if columnIndex < len(row) {
+		if columnIndex >= 0 && columnIndex < len(row) {
 			result = append(result, row[columnIndex])
+			found = true
 		}
+	}
+	if !found {
+		return []interface{}{}
 	}
 	return result
 }
+
 func arrayKeyExists(key interface{}, arr map[interface{}]interface{}) bool {
 	_, ok := arr[key]
 	return ok
@@ -327,6 +346,7 @@ func mapMap(m map[interface{}]interface{}, f func(interface{}, interface{}) (int
 
 func fileExists(filename string) bool {
 	_, err := os.Stat(filename)
+	fmt.Println("Error:", err) // Print the error for debugging
 	return err == nil
 }
 
@@ -405,6 +425,9 @@ func fileWriteLines(filePath string, lines []string) error {
 }
 
 func generateRandomString(length int) string {
+	if length <= 0 {
+		return ""
+	}
 	rand.Seed(time.Now().UnixNano())
 	var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 	b := make([]rune, length)

@@ -1,15 +1,18 @@
 package email
 
 import (
+	"crypto/tls"
 	"errors"
 	"io"
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/viper"
 	"gopkg.in/gomail.v2"
 )
 
 type EmailService struct {
+	dialer      *gomail.Dialer
 	host        string
 	port        int
 	username    string
@@ -27,9 +30,7 @@ type EmailService struct {
 func NewEmailService() (*EmailService, error) {
 	es := &EmailService{}
 	// Load the configuration file
-	viper.SetConfigName("config")
-	viper.SetConfigType("yaml")
-	viper.AddConfigPath(".")
+	viper.SetConfigFile("../config/config.yaml")
 	if err := viper.ReadInConfig(); err != nil {
 		return nil, err
 	}
@@ -51,10 +52,32 @@ func NewEmailService() (*EmailService, error) {
 	if !ok {
 		return nil, errors.New("missing smtp password configuration")
 	}
+	encryption, ok := smtpConfig["encryption"].(string)
+	if !ok {
+		encryption = "none"
+	}
+	mailer, ok := smtpConfig["mailer"].(string)
+	if !ok {
+		mailer = "smtp"
+	}
 	es.host = host
 	es.port = port
 	es.username = username
 	es.password = password
+	// Create a new SMTP client
+	d := gomail.NewDialer(es.host, es.port, es.username, es.password)
+	switch encryption {
+	case "tls":
+		d.TLSConfig = &tls.Config{ServerName: es.host}
+	case "ssl":
+		d.SSL = true
+		d.TLSConfig = &tls.Config{ServerName: es.host}
+	}
+	switch mailer {
+	case "smtp":
+		d.LocalName = "localhost"
+	}
+	es.dialer = d
 	return es, nil
 }
 
@@ -142,11 +165,8 @@ func (es *EmailService) Send() error {
 		}
 	}
 
-	// Create a new SMTP client
-	d := gomail.NewDialer(es.host, es.port, es.username, es.password)
-
-	// Send the message
-	if err := d.DialAndSend(m); err != nil {
+	// Send the message using the existing SMTP client
+	if err := es.dialer.DialAndSend(m); err != nil {
 		return err
 	}
 
@@ -159,13 +179,19 @@ func (es *EmailService) addAttachment(m *gomail.Message, filename string) error 
 		return err
 	}
 	defer file.Close()
-	m.Attach(filename, gomail.SetCopyFunc(func(w io.Writer) error {
-		_, err := file.Seek(0, 0)
-		if err != nil {
+
+	// Add the attachment to the message
+	_, fileName := filepath.Split(filename)
+	m.Attach(fileName,
+		gomail.SetCopyFunc(func(w io.Writer) error {
+			_, err := file.Seek(0, 0)
+			if err != nil {
+				return err
+			}
+			_, err = io.Copy(w, file)
 			return err
-		}
-		_, err = io.Copy(w, file)
-		return err
-	}))
+		}),
+	)
+
 	return nil
 }
