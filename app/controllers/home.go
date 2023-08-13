@@ -8,6 +8,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/mousav1/weiser/app/cache"
 	"github.com/mousav1/weiser/app/http/request"
+	"github.com/mousav1/weiser/app/views"
 )
 
 // HomeController is responsible for showing the home page.
@@ -73,4 +74,16 @@ func (c *HomeController) GetSessionData(ctx *fiber.Ctx) error {
 
 	ctx.Set("Content-Type", "application/json")
 	return ctx.Send(jsonData)
+}
+
+func (c *HomeController) ShowView(ctx *fiber.Ctx) error {
+	data := views.ViewData{
+		Title: "Home",
+		Data:  "John Smith",
+	}
+	err := views.View(ctx, data, "test.html")
+	if err != nil {
+		return err
+	}
+	return nil
 }
