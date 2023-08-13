@@ -1,6 +1,0 @@
-time="2023-07-29T15:29:27+03:30" level=info msg="This is an info message"
-time="2023-07-29T15:29:27+03:30" level=warning msg="This is a warning message"
-time="2023-07-29T15:29:27+03:30" level=error msg="This is an error message"
-time="2023-07-29T16:18:50+03:30" level=info msg="This is an info message"
-time="2023-07-29T16:18:50+03:30" level=warning msg="This is a warning message"
-time="2023-07-29T16:18:50+03:30" level=error msg="This is an error message"

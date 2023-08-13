@@ -84,8 +84,9 @@ func sameSiteToString(sameSite http.SameSite) string {
 		return "Lax"
 	case http.SameSiteNoneMode:
 		return "None"
+	default:
+		return ""
 	}
-	return ""
 }
 
 func getStringOrDefault(value interface{}, defaultValue string) string {
