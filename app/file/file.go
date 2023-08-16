@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -77,13 +78,20 @@ func DownloadFile(uploadDir string) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		// Open the file
 		filename := c.Params("filename")
-		file, err := os.Open(uploadDir + "/" + filename)
+		filePath := filepath.Join(uploadDir, filename)
+		file, err := os.Open(filePath)
 		if err != nil {
 			return c.Status(fiber.StatusNotFound).SendString("file not found")
 		}
 		defer file.Close()
 
-		// Send the file to the client
-		return c.SendStream(file)
+		// Read the file content into a buffer
+		fileContent, err := ioutil.ReadAll(file)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).SendString("failed to read file")
+		}
+
+		// Send the file content to the client
+		return c.Send(fileContent)
 	}
 }
