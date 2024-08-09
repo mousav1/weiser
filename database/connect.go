@@ -15,56 +15,62 @@ import (
 	"gorm.io/gorm"
 )
 
-var DB *gorm.DB
-var RedisClient *redis.Client
+var (
+	DB          *gorm.DB
+	RedisClient *redis.Client
+)
 
+// Connect initializes the database and Redis connections.
 func Connect() (*gorm.DB, error) {
-	// Load database settings from configuration file
+	if err := setupDatabases(); err != nil {
+		return nil, err
+	}
+	if err := migrateAndSeed(); err != nil {
+		return nil, err
+	}
+	return DB, nil
+}
+
+// setupDatabases configures and connects to the database and Redis.
+func setupDatabases() error {
+	var err error
 	dbType := viper.GetString("database.db_type")
 
-	var err error
-
-	// Connect to the database based on the type specified in the configuration file
 	switch dbType {
 	case "mysql":
 		DB, err = connectToMySQL()
 	case "postgres":
 		DB, err = connectToPostgres()
 	default:
-		return nil, errors.New("unknown database type")
+		return errors.New("unknown database type")
 	}
 
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to connect to database")
+		return errors.Wrap(err, "failed to connect to database")
 	}
 
-	// Set up database migrations and seeds
-	if err := migrateAndSeed(); err != nil {
-		return nil, errors.Wrap(err, "failed to run migrations and seeds")
-	}
+	// if err := setupRedis(); err != nil {
+	// 	return err
+	// }
 
-	return DB, nil
+	return nil
 }
 
-// Connect to MySQL database
+// connectToMySQL establishes a connection to the MySQL database.
 func connectToMySQL() (*gorm.DB, error) {
-
-	// Load database settings from configuration file
 	mysqlConfig := viper.GetStringMapString("database.mysql")
-
-	// Connect to the database using the settings loaded from the configuration file
-	db, err := gorm.Open(mysql.Open(fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
 		mysqlConfig["username"],
 		mysqlConfig["password"],
 		mysqlConfig["host"],
 		mysqlConfig["port"],
-		mysqlConfig["dbname"])), &gorm.Config{})
+		mysqlConfig["dbname"])
 
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to connect to MySQL database")
 	}
 
-	// Set temporary memory buffers for spatial indexes
 	if err := db.Exec("SET GLOBAL innodb_buffer_pool_size=1024 * 1024 * 1024").Error; err != nil {
 		return nil, errors.Wrap(err, "failed to set temporary memory buffers for spatial indexes")
 	}
@@ -72,12 +78,9 @@ func connectToMySQL() (*gorm.DB, error) {
 	return db, nil
 }
 
-// Connect to PostgreSQL database
+// connectToPostgres establishes a connection to the PostgreSQL database.
 func connectToPostgres() (*gorm.DB, error) {
-	// Load database settings from configuration file
 	postgresConfig := viper.GetStringMapString("database.postgres")
-
-	// Connect to the database using the settings loaded from the configuration file
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s",
 		postgresConfig["host"],
 		postgresConfig["user"],
@@ -85,13 +88,12 @@ func connectToPostgres() (*gorm.DB, error) {
 		postgresConfig["dbname"],
 		postgresConfig["port"],
 		postgresConfig["sslmode"])
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to connect to PostgreSQL database")
 	}
 
-	// Set temporary memory buffers for spatial indexes
 	if err := db.Exec("SET work_mem = '1GB'").Error; err != nil {
 		return nil, errors.Wrap(err, "failed to set temporary memory buffers for spatial indexes")
 	}
@@ -99,63 +101,63 @@ func connectToPostgres() (*gorm.DB, error) {
 	return db, nil
 }
 
+// setupRedis configures and connects to Redis.
+func setupRedis() error {
+	redisConfig := viper.GetStringMapString("database.redis.default")
+	var err error
+	RedisClient, err = ConnectToRedis(redisConfig)
+	if err != nil {
+		return errors.Wrap(err, "failed to connect to Redis")
+	}
+	return nil
+}
+
+// ConnectToRedis establishes a connection to Redis.
 func ConnectToRedis(redisConfig map[string]string) (*redis.Client, error) {
-	// Load Redis settings from configuration file
 	db, err := strconv.Atoi(redisConfig["dbname"])
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "invalid Redis DB number")
 	}
-	// Connect to Redis using the settings loaded from the configuration file
+
 	client := redis.NewClient(&redis.Options{
-		Addr:     redisConfig["host"] + ":" + redisConfig["port"],
+		Addr:     fmt.Sprintf("%s:%s", redisConfig["host"], redisConfig["port"]),
 		Password: redisConfig["password"],
-		DB:       db, // use default DB
+		DB:       db,
 	})
 
-	// Test the connection to Redis
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	_, err = client.Ping(ctx).Result()
-	if err != nil {
+	if _, err := client.Ping(ctx).Result(); err != nil {
 		return nil, errors.Wrap(err, "failed to connect to Redis")
 	}
 
 	return client, nil
 }
 
-func WriteToRedis(key string, value string) error {
-	// Connect to Redis
+// WriteToRedis writes a key-value pair to Redis.
+func WriteToRedis(key, value string) error {
 	if RedisClient == nil {
-		var err error
-		redisConfig := viper.GetStringMapString("database.redis.default")
-		RedisClient, err = ConnectToRedis(redisConfig)
-		if err != nil {
+		if err := setupRedis(); err != nil {
 			return errors.Wrap(err, "failed to connect to Redis")
 		}
 	}
 
-	// Write the value to Redis
-	err := RedisClient.Set(context.Background(), key, value, 0).Err()
-	if err != nil {
+	if err := RedisClient.Set(context.Background(), key, value, 0).Err(); err != nil {
 		return errors.Wrap(err, "failed to write value to Redis")
 	}
 
 	return nil
 }
 
+// ReadFromRedis reads a value from Redis by key.
 func ReadFromRedis(key string) (string, error) {
-	// Connect to Redis
 	if RedisClient == nil {
-		var err error
-		redisConfig := viper.GetStringMapString("database.redis.default")
-		RedisClient, err = ConnectToRedis(redisConfig)
-		if err != nil {
+		if err := setupRedis(); err != nil {
 			return "", errors.Wrap(err, "failed to connect to Redis")
 		}
 	}
 
-	// Read the value from Redis
 	value, err := RedisClient.Get(context.Background(), key).Result()
 	if err != nil {
 		return "", errors.Wrap(err, "failed to read value from Redis")
@@ -164,36 +166,45 @@ func ReadFromRedis(key string) (string, error) {
 	return value, nil
 }
 
+// Close closes database and Redis connections.
 func Close() error {
-	// Close the database connection
+	if err := closeDatabase(); err != nil {
+		return err
+	}
+	if err := closeRedis(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// closeDatabase closes the database connection.
+func closeDatabase() error {
 	if DB != nil {
 		db, err := DB.DB()
 		if err != nil {
 			return errors.Wrap(err, "failed to get database connection")
 		}
-		err = db.Close()
-		if err != nil {
+		if err := db.Close(); err != nil {
 			return errors.Wrap(err, "failed to close database connection")
 		}
 	}
-
-	// Close the Redis connection
-	if RedisClient != nil {
-		err := RedisClient.Close()
-		if err != nil {
-			return errors.Wrap(err, "failed to close Redis connection")
-		}
-	}
-
 	return nil
 }
 
+// closeRedis closes the Redis connection.
+func closeRedis() error {
+	if RedisClient != nil {
+		if err := RedisClient.Close(); err != nil {
+			return errors.Wrap(err, "failed to close Redis connection")
+		}
+	}
+	return nil
+}
+
+// migrateAndSeed performs database migrations and seeds.
 func migrateAndSeed() error {
-	// Migrate the schema
-	err := DB.AutoMigrate(&models.User{})
-	if err != nil {
+	if err := DB.AutoMigrate(&models.User{}); err != nil {
 		return errors.Wrap(err, "failed to migrate the schema")
 	}
-
 	return nil
 }
