@@ -1,8 +1,9 @@
 package database
 
 import (
-	"github.com/spf13/viper"
 	"testing"
+
+	"github.com/spf13/viper"
 )
 
 func TestConnect(t *testing.T) {
