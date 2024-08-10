@@ -53,10 +53,10 @@ func SetCookie(c *fiber.Ctx, name string, value string, expire time.Time) {
 	})
 }
 
-func GetCookie(c *fiber.Ctx, name string) (interface{}, error) {
+func GetCookie(c *fiber.Ctx, name string) (string, error) {
 	cookie := c.Cookies(name)
 	if cookie == "" {
-		return nil, errors.New("cookie not found")
+		return "", errors.New("کوکی یافت نشد")
 	}
 	return cookie, nil
 }

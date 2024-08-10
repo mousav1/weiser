@@ -9,6 +9,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/spf13/viper"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestSetCookie(t *testing.T) {
@@ -24,65 +25,72 @@ func TestSetCookie(t *testing.T) {
 
 	app := fiber.New()
 
+	// Define the route
 	app.Get("/", func(c *fiber.Ctx) error {
 		SetCookie(c, "mycookie", "Hello, World!", time.Now().Add(time.Hour))
 		return c.SendStatus(http.StatusOK)
 	})
 
+	// Create request
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	res, err := app.Test(req)
+
+	// Create a new Fiber context
+	resp, err := app.Test(req)
 
 	if err != nil {
 		t.Fatalf("Failed to execute request: %v", err)
 	}
 
-	if res.StatusCode != http.StatusOK {
-		t.Errorf("Expected status 200, but got %d", res.StatusCode)
-	}
+	// Validate response status
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	cookie := res.Cookies()[0]
-	if cookie.Name != "mycookie" {
-		t.Errorf("Expected cookie name 'mycookie', but got '%s'", cookie.Name)
-	}
-	if cookie.Value != "Hello, World!" {
-		t.Errorf("Expected cookie value 'Hello, World!', but got '%s'", cookie.Value)
+	// Validate the cookie
+	cookies := resp.Cookies()
+	if len(cookies) == 0 {
+		t.Error("Expected at least one cookie, but found none")
+	} else {
+		assert.Equal(t, "mycookie", cookies[0].Name)
+		assert.Equal(t, "Hello, World!", cookies[0].Value)
 	}
 }
 
 func TestGetCookie(t *testing.T) {
 	app := fiber.New()
 
+	// Define the route
 	app.Get("/", func(c *fiber.Ctx) error {
 		value, err := GetCookie(c, "mycookie")
 		if err != nil {
 			return c.SendStatus(http.StatusNotFound)
 		}
-		return c.SendString(value.(string))
+		return c.SendString(value)
 	})
 
-	cookie := new(http.Cookie)
-	cookie.Name = "mycookie"
-	cookie.Value = "Hello, World!"
+	// Create request and add cookie
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req.AddCookie(cookie)
-	res, err := app.Test(req)
+	req.AddCookie(&http.Cookie{
+		Name:  "mycookie",
+		Value: "Hello, World!",
+	})
+
+	// Create a new Fiber context and handler
+	resp, err := app.Test(req)
 
 	if err != nil {
 		t.Fatalf("Failed to execute request: %v", err)
 	}
 
-	if res.StatusCode != http.StatusOK {
-		t.Errorf("Expected status 200, but got %d", res.StatusCode)
-	}
-
-	responseBody, err := ioutil.ReadAll(res.Body)
+	// Read the response body
+	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatalf("Failed to read response body: %v", err)
 	}
-	response := string(responseBody)
-	if response != "Hello, World!" {
-		t.Errorf("Expected response 'Hello, World!', but got '%s'", response)
-	}
+
+	// Validate response status
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	// Validate response body
+	assert.Equal(t, "Hello, World!", string(body))
 }
 
 func TestSetHttpCookie(t *testing.T) {
@@ -93,10 +101,13 @@ func TestSetHttpCookie(t *testing.T) {
 	httpOnly := true
 	sameSite := http.SameSiteLaxMode
 
+	// Create a new ResponseRecorder to capture the HTTP response
 	w := httptest.NewRecorder()
 
+	// Set the HTTP cookie
 	SetHttpCookie(w, name, value, expire, secure, httpOnly, sameSite)
 
+	// Get the cookies from the response
 	cookies := w.Result().Cookies()
 	found := false
 	for _, cookie := range cookies {
