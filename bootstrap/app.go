@@ -56,7 +56,7 @@ func SetupApp() (*fiber.App, *fasthttp.Server, error) {
 	if err := session.InitSessionManager(); err != nil {
 		return nil, nil, fmt.Errorf("failed to initialize session manager: %w", err)
 	}
-	go middleware.DeleteExpiredSessions()
+	go middleware.StartSessionCleaner()
 
 	// Create a new in-memory cache with a default expiration of 1 minute
 	err = cache.InitializeCache(time.Minute, nil)
