@@ -59,7 +59,7 @@ func SetupApp() (*fiber.App, *fasthttp.Server, error) {
 	go middleware.DeleteExpiredSessions()
 
 	// Create a new in-memory cache with a default expiration of 1 minute
-	err = cache.NewCache(time.Minute, nil)
+	err = cache.InitializeCache(time.Minute, nil)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create cache: %w", err)
 	}

@@ -9,6 +9,7 @@ import (
 	"github.com/mousav1/weiser/app/cache"
 	"github.com/mousav1/weiser/app/http/request"
 	"github.com/mousav1/weiser/app/views"
+	"github.com/mousav1/weiser/facades"
 )
 
 // HomeController is responsible for showing the home page.
@@ -29,13 +30,13 @@ func NewHomeController() *HomeController {
 // Index shows the home page.
 func (c *HomeController) Index(ctx *fiber.Ctx) error {
 	person := Person{Name: "John", Age: 30}
-	err := cache.GetCache().Set("person", person, 5*time.Minute)
+	err := facades.Cache().Set("person", person, 5*time.Minute)
 	if err != nil {
 		return ctx.SendString(err.Error())
 	}
 
 	var cachedPerson Person
-	err = cache.GetCache().Get("person", &cachedPerson)
+	err = facades.Cache().Get("person", &cachedPerson)
 	if err != nil {
 		if err == cache.ErrCacheMiss {
 			fmt.Println("Value not found in cache")

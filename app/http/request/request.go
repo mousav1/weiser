@@ -24,52 +24,55 @@ type Request struct {
 
 func New(ctx *fiber.Ctx) (*Request, error) {
 	if ctx == nil {
-		return nil, errors.New("ctx is nil")
+		return nil, errors.New("context is nil")
 	}
 
 	validate := validation.New()
 
-	// تعریف تنظیمات خاص برای validator
-	// validate.RegisterValidation("my_validation", func(fl validator.FieldLevel) bool {
-	// 	// اعتبارسنجی خاص
-	// 	return true
-	// })
-
-	// additional error checks can be performed here
 	return &Request{ctx: ctx, validate: validate}, nil
 }
 
 func (r *Request) Bind(data interface{}) error {
-	// Check content type
 	contentType := r.ctx.Get("Content-Type")
+
 	switch contentType {
 	case "application/json":
 		if err := r.ctx.BodyParser(data); err != nil {
-			return err
+			return fmt.Errorf("failed to parse JSON body: %w", err)
 		}
 	case "application/x-www-form-urlencoded":
-		// Parse form data
-		formData := make(map[string]interface{})
-		if err := r.ctx.BodyParser(&formData); err != nil {
-			return err
-		}
-
-		// Map form data
-		if err := mapstructure.Decode(formData, &data); err != nil {
-			return err
+		if err := r.parseFormData(data); err != nil {
+			return fmt.Errorf("failed to parse form data: %w", err)
 		}
 	default:
 		return fmt.Errorf("unsupported content type: %s", contentType)
 	}
 
-	// اعتبارسنجی داده‌های دریافتی
-	validationErrors, _ := r.validate.Validate(data)
+	if err := r.validateData(data); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *Request) parseFormData(data interface{}) error {
+	formData := make(map[string]interface{})
+	if err := r.ctx.BodyParser(&formData); err != nil {
+		return err
+	}
+	return mapstructure.Decode(formData, &data)
+}
+
+func (r *Request) validateData(data interface{}) error {
+	validationErrors, err := r.validate.Validate(data)
+	if err != nil {
+		return fmt.Errorf("validation error: %w", err)
+	}
 	if validationErrors != nil {
 		response := r.validate.CreateErrorResponse(validationErrors)
 		jsonResp, _ := json.Marshal(response)
 		return fiber.NewError(http.StatusBadRequest, string(jsonResp))
 	}
-
 	return nil
 }
 
@@ -146,15 +149,16 @@ func (r *Request) IsSecure() bool {
 }
 
 func (r *Request) Is(p string) bool {
+	contentType := r.ctx.Get("Content-Type")
 	switch p {
 	case "json":
-		return strings.Contains(r.ctx.Get("Content-Type"), "application/json")
+		return strings.Contains(contentType, "application/json")
 	case "html":
-		return strings.Contains(r.ctx.Get("Content-Type"), "text/html")
+		return strings.Contains(contentType, "text/html")
 	case "xml":
-		return strings.Contains(r.ctx.Get("Content-Type"), "application/xml, text/xml")
+		return strings.Contains(contentType, "application/xml") || strings.Contains(contentType, "text/xml")
 	case "plain":
-		return strings.Contains(r.ctx.Get("Content-Type"), "text/plain")
+		return strings.Contains(contentType, "text/plain")
 	default:
 		return false
 	}
@@ -173,7 +177,7 @@ func (r *Request) Referer() string {
 }
 
 func (r *Request) Ajax() bool {
-	return strings.ToLower(r.ctx.Get("X-Requested-With")) == "xmlhttprequest"
+	return r.IsAjax()
 }
 
 func (r *Request) Header(key string) string {
@@ -195,11 +199,7 @@ func (r *Request) Int(key string, def ...int) (int, error) {
 	if val == "" && len(def) > 0 {
 		return def[0], nil
 	}
-	v, err := strconv.Atoi(val)
-	if err != nil {
-		return 0, err
-	}
-	return v, nil
+	return strconv.Atoi(val)
 }
 
 func (r *Request) Float(key string, def ...float64) (float64, error) {
@@ -207,11 +207,7 @@ func (r *Request) Float(key string, def ...float64) (float64, error) {
 	if val == "" && len(def) > 0 {
 		return def[0], nil
 	}
-	v, err := strconv.ParseFloat(val, 64)
-	if err != nil {
-		return 0, err
-	}
-	return v, nil
+	return strconv.ParseFloat(val, 64)
 }
 
 func (r *Request) Bool(key string, def ...bool) (bool, error) {
@@ -219,19 +215,15 @@ func (r *Request) Bool(key string, def ...bool) (bool, error) {
 	if val == "" && len(def) > 0 {
 		return def[0], nil
 	}
-	v, err := strconv.ParseBool(val)
-	if err != nil {
-		return false, err
-	}
-	return v, nil
+	return strconv.ParseBool(val)
 }
 
 func (r *Request) Root() string {
 	proto := "http"
-	if r.ctx.Protocol() == "https" {
+	if r.IsSecure() {
 		proto = "https"
 	}
-	return proto + "://" + r.ctx.Hostname()
+	return proto + "://" + r.Host()
 }
 
 func (r *Request) FullURL() string {
@@ -239,36 +231,21 @@ func (r *Request) FullURL() string {
 }
 
 func (r *Request) IsMethodSafe() bool {
-	method := r.ctx.Method()
+	method := r.Method()
 	return method == http.MethodGet || method == http.MethodHead
 }
 
 func (r *Request) IsJson() bool {
-	contentType := r.ctx.Get("Content-Type")
-	return strings.HasPrefix(contentType, "application/json")
+	return r.Is("json")
 }
 
 func (r *Request) IsXml() bool {
-	contentType := r.ctx.Get("Content-Type")
-	return strings.HasPrefix(contentType, "application/xml") || strings.HasPrefix(contentType, "text/xml")
+	return r.Is("xml")
 }
 
 func (r *Request) IsHtml() bool {
-	contentType := r.ctx.Get("Content-Type")
-	return strings.HasPrefix(contentType, "text/html")
+	return r.Is("html")
 }
-
-// func (r *Request) Cookies() map[string]string {
-// 	headers := r.ctx.Request().Header
-// 	result := make(map[string]string)
-// 	for _, cookie := range headers.PeekMulti("Cookie") {
-// 		parts := bytes.SplitN(cookie, []byte("="), 2)
-// 		if len(parts) == 2 {
-// 			result[string(parts[0])] = string(parts[1])
-// 		}
-// 	}
-// 	return result
-// }
 
 func (r *Request) Cookie(key string) (string, error) {
 	cookie := r.ctx.Cookies(key)
@@ -277,6 +254,7 @@ func (r *Request) Cookie(key string) (string, error) {
 	}
 	return cookie, nil
 }
+
 func (r *Request) Has(key string) bool {
 	return r.ctx.FormValue(key) != ""
 }
@@ -299,19 +277,15 @@ func (r *Request) AllFiles() map[string][]*multipart.FileHeader {
 }
 
 func (r *Request) getSessionID() (string, error) {
-	// Get the session manager
 	manager := session.GetSessionManager()
-
 	sessionID, err := cookies.GetCookie(r.ctx, "weiser_session")
 	if err != nil {
 		session := manager.StartSession(r.ctx)
 		return session.ID, nil
 	}
-	// Check if session ID is valid and has not expired
 	if err := manager.CheckExpiration(sessionID.(string)); err != nil {
-		return "", fmt.Errorf("session ID is invalid or has expired: %v", err)
+		return "", fmt.Errorf("session ID is invalid or has expired: %w", err)
 	}
-
 	return sessionID.(string), nil
 }
 

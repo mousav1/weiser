@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/viper"
 )
 
+// CacheDriver defines the interface for different cache drivers.
 type CacheDriver interface {
 	Get(key string, value interface{}) error
 	Set(key string, value interface{}, expiration time.Duration) error
@@ -21,53 +22,64 @@ type CacheDriver interface {
 	Stats() (CacheStats, error)
 }
 
+// Cache is a high-level abstraction over CacheDriver.
 type Cache struct {
 	driver            CacheDriver
 	defaultExpiration time.Duration
 	onEvicted         func(key string, value interface{})
 }
 
-var ErrCacheMiss = errors.New("cache: key not found")
-var cache *Cache
+var (
+	cacheInstance *Cache
+	once          sync.Once
+	ErrCacheMiss  = errors.New("cache: key not found")
+)
 
-func NewCache(defaultExpiration time.Duration, onEvicted func(key string, value interface{})) error {
-	var driver CacheDriver
-	cacheType := viper.GetString("cache.type")
+// NewCache initializes a new Cache instance.
+func InitializeCache(defaultExpiration time.Duration, onEvicted func(key string, value interface{})) error {
+	var err error
+	once.Do(func() {
+		var driver CacheDriver
+		cacheType := viper.GetString("cache.type")
 
-	switch cacheType {
-	case "redis":
-		client := redis.NewClient(&redis.Options{
-			Addr:     "localhost:6379",
-			Password: "",
-			DB:       0,
-		})
-		driver = NewRedisCache(client, defaultExpiration, onEvicted)
-	case "file":
-		filePath := viper.GetString("cache.file.path")
-		driver = NewFileCache(filePath)
-	case "memory":
-		driver = NewInMemoryCache(onEvicted)
-	default:
-		panic("unsupported cache type")
-	}
+		switch cacheType {
+		case "redis":
+			client := redis.NewClient(&redis.Options{
+				Addr:     viper.GetString("cache.redis.addr"),
+				Password: viper.GetString("cache.redis.password"),
+				DB:       viper.GetInt("cache.redis.db"),
+			})
+			driver = NewRedisCache(client, defaultExpiration, onEvicted)
+		case "file":
+			filePath := viper.GetString("cache.file.path")
+			driver = NewFileCache(filePath)
+		case "memory":
+			driver = NewInMemoryCache(onEvicted)
+		default:
+			err = errors.New("unsupported cache type")
+			return
+		}
 
-	cache = &Cache{
-		driver:            driver,
-		defaultExpiration: defaultExpiration,
-		onEvicted:         onEvicted,
-	}
-	return nil
+		cacheInstance = &Cache{
+			driver:            driver,
+			defaultExpiration: defaultExpiration,
+			onEvicted:         onEvicted,
+		}
+	})
+	return err
 }
 
-// GetSessionManager returns the initialized session manager
-func GetCache() *Cache {
-	return cache
+// GetCache returns the initialized Cache instance.
+func GetCacheInstance() *Cache {
+	return cacheInstance
 }
 
+// Get retrieves a value from the cache.
 func (c *Cache) Get(key string, value interface{}) error {
 	return c.driver.Get(key, value)
 }
 
+// Set stores a value in the cache.
 func (c *Cache) Set(key string, value interface{}, expiration time.Duration) error {
 	if expiration == 0 {
 		expiration = c.defaultExpiration
@@ -75,35 +87,37 @@ func (c *Cache) Set(key string, value interface{}, expiration time.Duration) err
 	return c.driver.Set(key, value, expiration)
 }
 
+// Delete removes a value from the cache.
 func (c *Cache) Delete(key string) error {
 	return c.driver.Delete(key)
 }
 
+// Exists checks if a key exists in the cache.
 func (c *Cache) Exists(key string) (bool, error) {
 	return c.driver.Exists(key)
 }
 
+// Flush clears all items from the cache.
 func (c *Cache) Flush() error {
 	return c.driver.Flush()
 }
 
+// Stats returns cache statistics.
 func (c *Cache) Stats() (CacheStats, error) {
-	stats, err := c.driver.Stats()
-	if err != nil {
-		return CacheStats{}, err
-	}
-	return stats, nil
+	return c.driver.Stats()
 }
 
-type inMemoryCache struct {
+// InMemoryCache is an in-memory cache implementation.
+type InMemoryCache struct {
 	cache     map[string][]byte
 	expiry    map[string]time.Time
 	mutex     sync.RWMutex
 	onEvicted func(string, interface{})
 }
 
-func NewInMemoryCache(onEvicted func(key string, value interface{})) *inMemoryCache {
-	return &inMemoryCache{
+// NewInMemoryCache initializes a new in-memory cache.
+func NewInMemoryCache(onEvicted func(key string, value interface{})) *InMemoryCache {
+	return &InMemoryCache{
 		cache:     make(map[string][]byte),
 		expiry:    make(map[string]time.Time),
 		mutex:     sync.RWMutex{},
@@ -111,7 +125,8 @@ func NewInMemoryCache(onEvicted func(key string, value interface{})) *inMemoryCa
 	}
 }
 
-func (c *inMemoryCache) Get(key string, value interface{}) error {
+// Get retrieves a value from the in-memory cache.
+func (c *InMemoryCache) Get(key string, value interface{}) error {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 
@@ -122,7 +137,8 @@ func (c *inMemoryCache) Get(key string, value interface{}) error {
 	return ErrCacheMiss
 }
 
-func (c *inMemoryCache) Set(key string, value interface{}, expiration time.Duration) error {
+// Set stores a value in the in-memory cache.
+func (c *InMemoryCache) Set(key string, value interface{}, expiration time.Duration) error {
 	if expiration == 0 {
 		expiration = time.Minute
 	}
@@ -135,11 +151,6 @@ func (c *inMemoryCache) Set(key string, value interface{}, expiration time.Durat
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	if c.cache == nil {
-		c.cache = make(map[string][]byte)
-		c.expiry = make(map[string]time.Time)
-	}
-
 	c.cache[key] = data
 	c.expiry[key] = time.Now().Add(expiration)
 
@@ -148,7 +159,8 @@ func (c *inMemoryCache) Set(key string, value interface{}, expiration time.Durat
 	return nil
 }
 
-func (c *inMemoryCache) Delete(key string) error {
+// Delete removes a value from the in-memory cache.
+func (c *InMemoryCache) Delete(key string) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -161,18 +173,17 @@ func (c *inMemoryCache) Delete(key string) error {
 	return ErrCacheMiss
 }
 
-func (c *inMemoryCache) Exists(key string) (bool, error) {
+// Exists checks if a key exists in the in-memory cache.
+func (c *InMemoryCache) Exists(key string) (bool, error) {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 
-	if _, ok := c.cache[key]; ok {
-		return true, nil
-	}
-
-	return false, nil
+	_, ok := c.cache[key]
+	return ok, nil
 }
 
-func (c *inMemoryCache) Flush() error {
+// Flush clears all items from the in-memory cache.
+func (c *InMemoryCache) Flush() error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -182,17 +193,16 @@ func (c *inMemoryCache) Flush() error {
 	return nil
 }
 
-func (c *inMemoryCache) Stats() (CacheStats, error) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+// Stats returns statistics of the in-memory cache.
+func (c *InMemoryCache) Stats() (CacheStats, error) {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
 
-	stats := CacheStats{
-		ItemsCount: int64(len(c.cache)),
-	}
-	return stats, nil
+	return CacheStats{ItemsCount: int64(len(c.cache))}, nil
 }
 
-func (c *inMemoryCache) startJanitor() {
+// startJanitor periodically cleans up expired items.
+func (c *InMemoryCache) startJanitor() {
 	for {
 		time.Sleep(time.Minute)
 
@@ -211,12 +221,14 @@ func (c *inMemoryCache) startJanitor() {
 	}
 }
 
+// RedisCache is a Redis cache implementation.
 type RedisCache struct {
 	client            *redis.Client
 	defaultExpiration time.Duration
 	onEvicted         func(key string, value interface{})
 }
 
+// NewRedisCache initializes a new Redis cache.
 func NewRedisCache(client *redis.Client, defaultExpiration time.Duration, onEvicted func(key string, value interface{})) *RedisCache {
 	return &RedisCache{
 		client:            client,
@@ -225,8 +237,9 @@ func NewRedisCache(client *redis.Client, defaultExpiration time.Duration, onEvic
 	}
 }
 
-func (c *RedisCache) Get(key string, value interface{}) error {
-	data, err := c.client.Get(context.Background(), key).Bytes()
+// Get retrieves a value from the Redis cache.
+func (r *RedisCache) Get(key string, value interface{}) error {
+	data, err := r.client.Get(context.Background(), key).Bytes()
 	if err != nil {
 		if err == redis.Nil {
 			return ErrCacheMiss
@@ -237,9 +250,10 @@ func (c *RedisCache) Get(key string, value interface{}) error {
 	return json.Unmarshal(data, value)
 }
 
-func (c *RedisCache) Set(key string, value interface{}, expiration time.Duration) error {
+// Set stores a value in the Redis cache.
+func (r *RedisCache) Set(key string, value interface{}, expiration time.Duration) error {
 	if expiration == 0 {
-		expiration = c.defaultExpiration
+		expiration = r.defaultExpiration
 	}
 
 	data, err := json.Marshal(value)
@@ -247,15 +261,17 @@ func (c *RedisCache) Set(key string, value interface{}, expiration time.Duration
 		return err
 	}
 
-	return c.client.Set(context.Background(), key, data, expiration).Err()
+	return r.client.Set(context.Background(), key, data, expiration).Err()
 }
 
-func (c *RedisCache) Delete(key string) error {
-	return c.client.Del(context.Background(), key).Err()
+// Delete removes a value from the Redis cache.
+func (r *RedisCache) Delete(key string) error {
+	return r.client.Del(context.Background(), key).Err()
 }
 
-func (c *RedisCache) Exists(key string) (bool, error) {
-	exists, err := c.client.Exists(context.Background(), key).Result()
+// Exists checks if a key exists in the Redis cache.
+func (r *RedisCache) Exists(key string) (bool, error) {
+	exists, err := r.client.Exists(context.Background(), key).Result()
 	if err != nil {
 		return false, err
 	}
@@ -263,13 +279,15 @@ func (c *RedisCache) Exists(key string) (bool, error) {
 	return exists > 0, nil
 }
 
-func (c *RedisCache) Flush() error {
-	return c.client.FlushDB(context.Background()).Err()
+// Flush clears all items from the Redis cache.
+func (r *RedisCache) Flush() error {
+	return r.client.FlushDB(context.Background()).Err()
 }
 
-func (c *RedisCache) Stats() (CacheStats, error) {
+// Stats returns statistics of the Redis cache.
+func (r *RedisCache) Stats() (CacheStats, error) {
 	stats := CacheStats{}
-	keys, err := c.client.Keys(context.Background(), "*").Result()
+	keys, err := r.client.Keys(context.Background(), "*").Result()
 	if err != nil {
 		return stats, err
 	}
@@ -277,17 +295,20 @@ func (c *RedisCache) Stats() (CacheStats, error) {
 	return stats, nil
 }
 
+// CacheItem represents an item stored in the file cache.
 type CacheItem struct {
 	Value     interface{}
 	ExpiresAt time.Time
 }
 
+// FileCache is a file-based cache implementation.
 type FileCache struct {
 	cache map[string]CacheItem
 	mutex sync.Mutex
 	path  string
 }
 
+// NewFileCache initializes a new file-based cache.
 func NewFileCache(path string) *FileCache {
 	return &FileCache{
 		cache: make(map[string]CacheItem),
@@ -295,111 +316,103 @@ func NewFileCache(path string) *FileCache {
 	}
 }
 
-func (c *FileCache) Get(key string, value interface{}) error {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+// Get retrieves a value from the file cache.
+func (f *FileCache) Get(key string, value interface{}) error {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
 
-	bytes, err := ioutil.ReadFile(c.path)
+	// Read the entire cache file
+	bytes, err := ioutil.ReadFile(f.path)
 	if err != nil {
 		return err
 	}
 
-	if err := json.Unmarshal(bytes, &c.cache); err != nil {
+	// Unmarshal the file content into the cache map
+	if err := json.Unmarshal(bytes, &f.cache); err != nil {
 		return err
 	}
 
-	item, ok := c.cache[key]
+	// Get the cache item
+	item, ok := f.cache[key]
 	if !ok || item.ExpiresAt.Before(time.Now()) {
 		return ErrCacheMiss
 	}
 
-	jsonValue, err := json.Marshal(item.Value)
-	if err != nil {
-		return err
+	// Unmarshal the item.Value which is stored as a []byte
+	data, ok := item.Value.([]byte)
+	if !ok {
+		return errors.New("cache: invalid data type")
 	}
 
-	if err := json.Unmarshal(jsonValue, value); err != nil {
-		return err
-	}
-
-	return nil
+	return json.Unmarshal(data, value)
 }
 
-func (c *FileCache) Set(key string, value interface{}, expiration time.Duration) error {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+// Set stores a value in the file cache.
+func (f *FileCache) Set(key string, value interface{}, expiration time.Duration) error {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
 
-	c.cache[key] = CacheItem{
+	f.cache[key] = CacheItem{
 		Value:     value,
 		ExpiresAt: time.Now().Add(expiration),
 	}
 
-	bytes, err := json.Marshal(c.cache)
+	bytes, err := json.Marshal(f.cache)
 	if err != nil {
 		return err
 	}
 
-	if err := ioutil.WriteFile(c.path, bytes, 0644); err != nil {
-		return err
-	}
-
-	return nil
+	return ioutil.WriteFile(f.path, bytes, 0644)
 }
 
-func (c *FileCache) Delete(key string) error {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+// Delete removes a value from the file cache.
+func (f *FileCache) Delete(key string) error {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
 
-	delete(c.cache, key)
+	delete(f.cache, key)
 
-	bytes, err := json.Marshal(c.cache)
+	bytes, err := json.Marshal(f.cache)
 	if err != nil {
 		return err
 	}
 
-	if err := ioutil.WriteFile(c.path, bytes, 0644); err != nil {
-		return err
-	}
-
-	return nil
+	return ioutil.WriteFile(f.path, bytes, 0644)
 }
 
-type CacheStats struct {
-	ItemsCount int64
-}
+// Exists checks if a key exists in the file cache.
+func (f *FileCache) Exists(key string) (bool, error) {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
 
-func (c *FileCache) Exists(key string) (bool, error) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-
-	_, ok := c.cache[key]
+	_, ok := f.cache[key]
 	return ok, nil
 }
 
-func (c *FileCache) Flush() error {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+// Flush clears all items from the file cache.
+func (f *FileCache) Flush() error {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
 
-	c.cache = make(map[string]CacheItem)
+	f.cache = make(map[string]CacheItem)
 
-	bytes, err := json.Marshal(c.cache)
+	bytes, err := json.Marshal(f.cache)
 	if err != nil {
 		return err
 	}
 
-	if err := ioutil.WriteFile(c.path, bytes, 0644); err != nil {
-		return err
-	}
-
-	return nil
+	return ioutil.WriteFile(f.path, bytes, 0644)
 }
 
-func (c *FileCache) Stats() (CacheStats, error) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
+// Stats returns statistics of the file cache.
+func (f *FileCache) Stats() (CacheStats, error) {
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
 
-	stats := CacheStats{
-		ItemsCount: int64(len(c.cache)),
-	}
-	return stats, nil
+	return CacheStats{ItemsCount: int64(len(f.cache))}, nil
+}
+
+// CacheStats holds statistics about the cache.
+type CacheStats struct {
+	ItemsCount int64
 }
