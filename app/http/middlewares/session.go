@@ -22,7 +22,7 @@ func SessionMiddleware(c *fiber.Ctx) error {
 	}
 
 	// Check if session ID is valid and has not expired
-	if err := manager.CheckExpiration(sessionID.(string)); err != nil {
+	if err := manager.CheckExpiration(sessionID); err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": err.Error(),
 		})

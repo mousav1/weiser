@@ -11,59 +11,56 @@ import (
 	"github.com/spf13/viper"
 )
 
-// ViewData is a struct that holds the data required for rendering a view
+// ViewData holds the data for rendering a view
 type ViewData struct {
 	Title string
 	Data  interface{}
 }
 
-// TemplateEngine is an enum that represents the supported template engines
-type TemplateEngine int
+// TemplateEngine represents the supported template engines
+type TemplateEngine string
 
 const (
-	HTMLTemplate TemplateEngine = iota
-	Pongo2Template
+	HTMLTemplate   TemplateEngine = "html"
+	Pongo2Template TemplateEngine = "pongo2"
 )
 
-// View is a struct that represents a template view
-type ViewTemplate struct {
+// View is an interface that defines the methods for rendering a view
+type View interface {
+	Render(c *fiber.Ctx, data ViewData) error
+}
+
+// HTMLView renders HTML templates
+type HTMLView struct {
 	Template *template.Template
 }
 
-// ViewPongo2 is a struct that represents a template view with Pongo2
-type ViewPongo2 struct {
+// Pongo2View renders Pongo2 templates
+type Pongo2View struct {
 	Template *pongo2.Template
 }
 
-var templateEngineNames = map[TemplateEngine]string{
-	HTMLTemplate:   "html",
-	Pongo2Template: "pongo2",
-	// Add other supported template engines here
-}
-
-// Render renders the view with the given data
-func (v *ViewTemplate) Render(c *fiber.Ctx, data ViewData) error {
+// Render renders the HTML view with the given data
+func (v *HTMLView) Render(c *fiber.Ctx, data ViewData) error {
 	c.Set("Content-Type", "text/html; charset=utf-8")
 	viewData := struct{ Data ViewData }{Data: data}
-	err := v.Template.Execute(c, viewData)
-	if err != nil {
+	if err := v.Template.Execute(c, viewData); err != nil {
 		return fmt.Errorf("could not render HTML template: %w", err)
 	}
 	return nil
 }
 
-// RenderPongo2 renders the view with the given data using Pongo2
-func (v *ViewPongo2) RenderPongo2(c *fiber.Ctx, data ViewData) error {
+// Render renders the Pongo2 view with the given data
+func (v *Pongo2View) Render(c *fiber.Ctx, data ViewData) error {
 	c.Set("Content-Type", "text/html; charset=utf-8")
-	err := v.Template.ExecuteWriter(pongo2.Context{"Data": data}, c)
-	if err != nil {
+	if err := v.Template.ExecuteWriter(pongo2.Context{"Data": data}, c); err != nil {
 		return fmt.Errorf("could not render Pongo2 template: %w", err)
 	}
 	return nil
 }
 
-// NewView creates a new view with the given template files and engine
-func NewView(pattern string) (interface{}, error) {
+// NewView creates a new view based on the template engine configuration
+func NewView(pattern string) (View, error) {
 	engine := viper.GetString("template_engine")
 	if engine == "" {
 		return nil, errors.New("template engine is not specified in configuration")
@@ -76,47 +73,29 @@ func NewView(pattern string) (interface{}, error) {
 
 	templatePath := filepath.Join(templateDir, pattern)
 
-	var view interface{}
-	var err error
-	switch engine {
-	case templateEngineNames[HTMLTemplate]:
+	switch TemplateEngine(engine) {
+	case HTMLTemplate:
 		tpl := template.Must(template.ParseFiles(templatePath))
-		view = &ViewTemplate{
-			Template: tpl,
-		}
-	case templateEngineNames[Pongo2Template]:
-		var tpl *pongo2.Template
-		tpl, err = pongo2.FromFile(templatePath)
+		return &HTMLView{Template: tpl}, nil
+	case Pongo2Template:
+		tpl, err := pongo2.FromFile(templatePath)
 		if err != nil {
 			return nil, fmt.Errorf("could not parse Pongo2 template: %w", err)
 		}
-		view = &ViewPongo2{
-			Template: tpl,
-		}
+		return &Pongo2View{Template: tpl}, nil
 	default:
 		return nil, errors.New("unsupported template engine")
 	}
-
-	return view, nil
 }
 
-// view renders a view with the given data
-func View(c *fiber.Ctx, data ViewData, files string) error {
-	viewI, err := NewView(files)
+// RenderView renders a view with the given data
+func RenderView(c *fiber.Ctx, data ViewData, files string) error {
+	view, err := NewView(files)
 	if err != nil {
 		return fmt.Errorf("could not create view: %w", err)
 	}
 
-	switch view := viewI.(type) {
-	case *ViewTemplate:
-		err = view.Render(c, data)
-	case *ViewPongo2:
-		err = view.RenderPongo2(c, data)
-	default:
-		return errors.New("unsupported view type")
-	}
-
-	if err != nil {
+	if err := view.Render(c, data); err != nil {
 		return fmt.Errorf("could not render view: %w", err)
 	}
 

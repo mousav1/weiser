@@ -82,7 +82,7 @@ func (c *HomeController) ShowView(ctx *fiber.Ctx) error {
 		Title: "Home",
 		Data:  "John Smith",
 	}
-	err := views.View(ctx, data, "test.html")
+	err := views.RenderView(ctx, data, "test.html")
 	if err != nil {
 		return err
 	}

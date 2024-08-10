@@ -283,10 +283,10 @@ func (r *Request) getSessionID() (string, error) {
 		session := manager.StartSession(r.ctx)
 		return session.ID, nil
 	}
-	if err := manager.CheckExpiration(sessionID.(string)); err != nil {
+	if err := manager.CheckExpiration(sessionID); err != nil {
 		return "", fmt.Errorf("session ID is invalid or has expired: %w", err)
 	}
-	return sessionID.(string), nil
+	return sessionID, nil
 }
 
 func (r *Request) Getsession(key string) interface{} {

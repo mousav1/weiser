@@ -41,6 +41,7 @@ func SetupRoutes(app *fiber.App, db *gorm.DB) error {
 	}
 
 	app.Get("/", homeController.Index)
+	app.Get("/show", homeController.ShowView)
 	app.Get("/set-session", homeController.SetSessionData)
 	app.Get("/get-session", homeController.GetSessionData)
 
