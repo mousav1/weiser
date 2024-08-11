@@ -59,3 +59,12 @@ cache:
   type: memory
   file: 
     path: "./storage/cache/logs.txt"
+storage:
+  default: local
+  disks:
+    local:
+      driver: local
+      base_path: "./storage"
+    s3:
+      driver: s3
+      bucket: "your-s3-bucket"

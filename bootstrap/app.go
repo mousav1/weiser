@@ -14,6 +14,7 @@ import (
 	kernel "github.com/mousav1/weiser/app/http"
 	middleware "github.com/mousav1/weiser/app/http/middlewares"
 	"github.com/mousav1/weiser/app/session"
+	"github.com/mousav1/weiser/app/storage"
 	"github.com/mousav1/weiser/database"
 	"github.com/mousav1/weiser/routes"
 	"github.com/spf13/viper"
@@ -62,6 +63,13 @@ func SetupApp() (*fiber.App, *fasthttp.Server, error) {
 	err = cache.InitializeCache(time.Minute, nil)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create cache: %w", err)
+	}
+
+	// Initialize storage
+	defaultDriverName := viper.GetString("storage.default")
+	storageConfig := viper.Sub("storage.disks")
+	if err := storage.InitializeStorage(defaultDriverName, storageConfig); err != nil {
+		return nil, nil, fmt.Errorf("failed to initialize storage: %w", err)
 	}
 
 	// Create the Fiber app

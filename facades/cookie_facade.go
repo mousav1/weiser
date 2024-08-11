@@ -20,5 +20,6 @@ func (cf *CookieFacade) Get(c *fiber.Ctx, name string) (string, error) {
 	return cookies.GetCookie(c, name)
 }
 
-// Instantiate CookieFacade globally
-var Cookie = &CookieFacade{}
+func NewCookieFacade() *CookieFacade {
+	return &CookieFacade{}
+}
